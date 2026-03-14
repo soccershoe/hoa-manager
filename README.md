@@ -2,6 +2,8 @@
 
 A free, self-hosted web app for small homeowners associations to manage properties, dues, violations, board tasks, and more — built on Google Apps Script and Google Sheets. No server, no subscription, no third-party database.
 
+Fyi:  this is 95% vibe-coded.  Use cautiously.
+
 ![HOA Manager screenshot](screenshot.png)
 
 ---
