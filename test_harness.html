@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HOA Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F8FAFC;--surf:#FFFFFF;--bdr:#E2E8F0;--bdr2:#CBD5E1;
+  --ind:#4F46E5;--ind2:#4338CA;--indl:#EEF2FF;--indm:#C7D2FE;
+  --sl:#0F172A;--sl2:#334155;--mu:#64748B;--fa:#94A3B8;
+  --gn:#059669;--gnb:#D1FAE5;--rd:#DC2626;--rdb:#FEE2E2;
+  --yw:#D97706;--ywb:#FEF3C7;--pu:#7C3AED;--pub:#EDE9FE;
+  --sh:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --shm:0 4px 6px rgba(0,0,0,.05),0 2px 4px rgba(0,0,0,.04);
+  --shl:0 10px 25px rgba(0,0,0,.08),0 4px 10px rgba(0,0,0,.04);
+  --r:8px;--rl:12px;
+}
+html,body{height:100%;font-family:'Inter',system-ui,sans-serif;font-size:14px;color:var(--sl);background:var(--bg);-webkit-font-smoothing:antialiased}
+
+/* Spinner */
+.spin-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:12px;color:var(--mu);font-size:13px}
+.spinner{width:32px;height:32px;border:3px solid var(--bdr);border-top-color:var(--ind);border-radius:50%;animation:spin .65s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Header */
+.hdr{background:var(--surf);border-bottom:1px solid var(--bdr);padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:10}
+.hdr-l{display:flex;align-items:center;gap:12px}
+.hdr-logo{width:32px;height:32px;background:var(--ind);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0}
+.hdr-title{font-size:15px;font-weight:600}
+.hdr-sub{font-size:11px;color:var(--mu);margin-top:1px}
+.hdr-r{display:flex;gap:8px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--r);border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;transition:all .15s;line-height:1;white-space:nowrap}
+.btn-p{background:var(--ind);color:#fff}.btn-p:hover{background:var(--ind2)}
+.btn-s{background:var(--surf);color:var(--sl2);border:1px solid var(--bdr2)}.btn-s:hover{background:var(--bg);border-color:var(--ind);color:var(--ind)}
+.btn-g{background:transparent;color:var(--mu);padding:6px 10px}.btn-g:hover{background:var(--bg);color:var(--sl)}
+.btn-d{background:var(--rdb);color:var(--rd);border:1px solid #FECACA}.btn-d:hover{background:#FEE2E2}
+.btn-w{background:var(--ywb);color:var(--yw);border:1px solid #FDE68A}.btn-w:hover{background:#FDE68A}
+.btn-sm{padding:5px 10px;font-size:12px}
+.bico{background:transparent;border:none;cursor:pointer;padding:5px;border-radius:6px;color:var(--fa);font-size:13px;transition:all .15s;display:inline-flex;align-items:center}
+.bico:hover{background:var(--bg);color:var(--mu)}
+
+/* Tabs */
+.tabs{background:var(--surf);border-bottom:1px solid var(--bdr);padding:0 28px;display:flex;gap:4px}
+.tab{padding:12px 14px;font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;color:var(--mu);transition:all .15s;margin-bottom:-1px}
+.tab.on{color:var(--ind);border-bottom-color:var(--ind)}
+.tab:hover:not(.on){color:var(--sl)}
+
+/* Sub-tabs (Board) */
+.subnav{display:flex;gap:3px;margin-bottom:20px;background:var(--bg);border:1px solid var(--bdr);border-radius:var(--r);padding:4px;width:fit-content}
+.stab{padding:6px 16px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;color:var(--mu);transition:all .15s}
+.stab.on{background:var(--surf);color:var(--ind);box-shadow:var(--sh)}
+.stab:hover:not(.on){color:var(--sl)}
+
+/* Layout */
+.page{padding:24px 28px;max-width:1140px}
+
+/* Stats */
+.stats{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.stat{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rl);padding:16px 20px;flex:1;min-width:120px;box-shadow:var(--sh)}
+.s-lbl{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--mu);margin-bottom:6px}
+.s-val{font-size:26px;font-weight:700;color:var(--sl);line-height:1}
+.vi{color:var(--ind)}.vg{color:var(--gn)}.vr{color:var(--rd)}.vy{color:var(--yw)}
+
+/* Property list */
+.prop-layout{display:grid;grid-template-columns:280px 1fr;gap:16px;align-items:start}
+.search-inp{width:100%;padding:8px 12px;border:1px solid var(--bdr2);border-radius:var(--r);font-family:inherit;font-size:13px;outline:none;background:var(--surf);margin-bottom:8px}
+.search-inp:focus{border-color:var(--ind);box-shadow:0 0 0 3px rgba(79,70,229,.1)}
+.filter-row{display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:12px;color:var(--mu);cursor:pointer}
+.filter-row input{accent-color:var(--ind)}
+.list-lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mu);margin-bottom:8px}
+.prop-list{display:flex;flex-direction:column;gap:6px}
+.pc{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rl);padding:14px 16px;cursor:pointer;transition:all .15s;box-shadow:var(--sh)}
+.pc:hover{border-color:var(--ind);box-shadow:var(--shm)}
+.pc.on{border-color:var(--ind);background:var(--indl)}
+.pc.dim{opacity:.55}
+.pc-addr{font-size:13px;font-weight:600;color:var(--sl);margin-bottom:2px}
+.pc-owner{font-size:12px;color:var(--mu)}
+.pc-bdg{margin-top:7px;display:flex;gap:5px;flex-wrap:wrap}
+
+/* Badges */
+.bdg{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.b-pd{background:var(--gnb);color:var(--gn)}
+.b-un{background:var(--rdb);color:var(--rd)}
+.b-pt{background:var(--ywb);color:var(--yw)}
+.b-vl{background:var(--rdb);color:var(--rd)}
+.b-nr{background:var(--pub);color:var(--pu)}
+.b-in{background:#F1F5F9;color:var(--mu);border:1px solid var(--bdr)}
+.b-sd{background:#F0FDF4;color:#166534;border:1px solid #BBF7D0}
+
+/* Detail panel */
+.dp{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rl);box-shadow:var(--shm);overflow:hidden}
+.dp-hdr{padding:20px 24px;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.dp-addr{font-size:18px;font-weight:700}
+.dp-sub{font-size:13px;color:var(--mu);margin-top:3px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.dp-acts{display:flex;gap:8px;flex-shrink:0}
+.bal-strip{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bdr);border-bottom:1px solid var(--bdr)}
+.bal-cell{background:var(--bg);padding:10px 16px;text-align:center}
+.bal-lbl{font-size:11px;color:var(--mu);margin-bottom:3px}
+.bal-val{font-size:15px;font-weight:700}
+.dp-body{padding:20px 24px}
+.dp-sec{margin-bottom:24px}.dp-sec:last-child{margin-bottom:0}
+.dp-shd{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mu);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center}
+.igrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ik{font-size:11px;color:var(--fa);margin-bottom:2px;font-weight:500}
+.iv{font-size:13px;color:var(--sl);font-weight:500}
+.cbox{background:var(--indl);border:1px solid var(--indm);border-radius:var(--r);padding:12px 16px;margin-top:10px}
+.cbox-lbl{font-size:11px;font-weight:600;color:var(--ind);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+
+/* Table */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{padding:8px 12px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--mu);background:var(--bg);border-bottom:1px solid var(--bdr)}
+.tbl td{padding:9px 12px;border-bottom:1px solid var(--bdr);color:var(--sl2);vertical-align:middle}
+.tbl tbody tr:last-child td{border-bottom:none}
+.tbl tbody tr:hover td{background:var(--bg)}
+
+/* Violations */
+.vc{background:var(--bg);border:1px solid var(--bdr);border-radius:var(--r);padding:10px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.vc-dt{font-size:11px;color:var(--mu);margin-bottom:2px}
+.vc-tx{font-size:13px;color:var(--sl)}
+.vc-st{font-size:11px;font-weight:600;margin-top:4px}
+.vc-st.open{color:var(--rd)}.vc-st.resolved{color:var(--gn)}
+.vc-acts{display:flex;gap:2px;flex-shrink:0}
+
+/* Doc log */
+.doc-row{display:flex;justify-content:space-between;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--bdr);gap:8px}
+.doc-row:last-child{border-bottom:none}
+.doc-dt{font-size:11px;color:var(--mu);white-space:nowrap;flex-shrink:0}
+.doc-tx{font-size:13px;color:var(--sl)}
+
+/* Tasks */
+.tk-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.tk-top-l h2{font-size:16px;font-weight:600}
+.tk-top-l p{font-size:12px;color:var(--mu);margin-top:2px}
+.tk-top-r{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.yr-nav{display:flex;align-items:center;gap:6px}
+.yr-val{font-size:16px;font-weight:700;min-width:48px;text-align:center}
+.load-btn{background:var(--indl);color:var(--ind);border:1px solid var(--indm);border-radius:var(--r);padding:7px 14px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.load-btn:hover{background:var(--ind);color:#fff}
+.prog-bar{height:4px;background:var(--bdr);border-radius:2px;margin-bottom:20px;overflow:hidden}
+.prog-fill{height:100%;background:var(--ind);border-radius:2px;transition:width .35s}
+.mo-block{margin-bottom:16px;border:1px solid var(--bdr);border-radius:var(--rl);overflow:hidden}
+.mo-head{background:var(--sl);color:#fff;padding:8px 16px;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.tk-row{display:grid;grid-template-columns:28px 1fr auto auto;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--bdr);background:var(--surf);transition:background .12s}
+.tk-row:last-child{border-bottom:none}
+.tk-row:hover{background:var(--bg)}
+.tk-row.done .t-dsc{text-decoration:line-through;color:var(--fa)}
+.t-chk{width:18px;height:18px;border:2px solid var(--bdr2);border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;font-size:10px}
+.t-chk:hover{border-color:var(--ind)}
+.t-chk.on{background:var(--ind);border-color:var(--ind);color:#fff}
+.t-dsc{font-size:13px;color:var(--sl)}
+.t-sub{font-size:11px;color:var(--mu);margin-top:2px}
+.t-asgn{font-size:12px;color:var(--mu);white-space:nowrap}
+.t-due{font-size:11px;padding:2px 7px;border-radius:10px;white-space:nowrap}
+.t-due.late{background:var(--rdb);color:var(--rd)}
+.t-due.soon{background:var(--ywb);color:var(--yw)}
+.t-due.ok{color:var(--mu)}
+.t-acts{display:flex;gap:2px}
+.tmpl-note{background:var(--indl);border:1px solid var(--indm);border-radius:var(--rl);padding:14px 18px;margin-bottom:20px;font-size:13px;color:var(--sl2);line-height:1.5}
+
+/* Board cards */
+.bc{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rl);padding:16px 20px;margin-bottom:10px;box-shadow:var(--sh);display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.bc-info .bc-name{font-size:14px;font-weight:600}
+.bc-info .bc-role{font-size:12px;color:var(--ind);font-weight:500;margin-top:2px}
+.bc-info .bc-dtl{font-size:12px;color:var(--mu);margin-top:6px;line-height:1.6}
+.bc-acts{display:flex;gap:4px;flex-shrink:0}
+.min-card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rl);padding:16px 20px;margin-bottom:10px;box-shadow:var(--sh)}
+.min-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.min-dt{font-size:11px;color:var(--mu)}
+.min-title{font-size:14px;font-weight:600;margin-top:1px}
+.min-att{font-size:12px;color:var(--mu);margin-bottom:8px}
+.min-notes{font-size:13px;color:var(--sl2);line-height:1.5;white-space:pre-wrap;background:var(--bg);border-radius:var(--r);padding:10px 12px}
+
+/* Reports */
+.rpt-sec{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--rl);margin-bottom:16px;overflow:hidden;box-shadow:var(--sh)}
+.rpt-hd{padding:14px 20px;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.rpt-hd h3{font-size:14px;font-weight:600}
+.rpt-body{padding:16px 20px}
+.email-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.email-lbl{font-size:13px;color:var(--sl)}
+.email-cnt{font-size:12px;color:var(--mu);flex:1}
+.copy-box{background:var(--bg);border:1px solid var(--bdr);border-radius:var(--r);padding:8px 12px;font-size:11px;font-family:monospace;color:var(--mu);word-break:break-all;max-height:48px;overflow:hidden;margin:4px 0 8px;line-height:1.4}
+
+/* Modal */
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+.modal{background:var(--surf);border-radius:var(--rl);width:100%;max-width:560px;box-shadow:var(--shl);max-height:90vh;overflow-y:auto}
+.modal-hd{padding:20px 24px 0;display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.modal-hd h3{font-size:16px;font-weight:600}
+.modal-bd{padding:0 24px}
+.modal-ft{padding:16px 24px;border-top:1px solid var(--bdr);display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.fg{margin-bottom:14px}
+.fg label{display:block;font-size:11px;font-weight:600;color:var(--mu);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em}
+.fg input,.fg select,.fg textarea{width:100%;padding:8px 12px;border:1px solid var(--bdr2);border-radius:var(--r);font-family:inherit;font-size:13px;color:var(--sl);background:var(--surf);outline:none;transition:border-color .15s}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--ind);box-shadow:0 0 0 3px rgba(79,70,229,.1)}
+.fg textarea{resize:vertical;min-height:64px}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sdiv{font-size:11px;font-weight:600;color:var(--ind);text-transform:uppercase;letter-spacing:.06em;padding:10px 0 6px;border-bottom:1px solid var(--indm);margin-bottom:14px;margin-top:4px}
+.tgl{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:10px 12px;background:var(--bg);border-radius:var(--r);border:1px solid var(--bdr)}
+.tgl label{font-size:13px;font-weight:500;cursor:pointer}
+.tgl input[type=checkbox]{width:16px;height:16px;accent-color:var(--ind);cursor:pointer;flex-shrink:0}
+.notice-area{width:100%;padding:14px;border:1px solid var(--bdr2);border-radius:var(--r);font-family:monospace;font-size:12px;color:var(--sl2);line-height:1.7;background:var(--bg);outline:none;resize:none;height:340px}
+
+/* Misc */
+.empty-st{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 20px;text-align:center;color:var(--mu)}
+.empty-st .ico{font-size:2rem;margin-bottom:10px}
+.empty-st p{font-size:13px;line-height:1.6}
+
+/* Print */
+@media print{
+  .hdr,.tabs,.hdr-r,.dp-acts,.bico,.t-acts,.bc-acts,.btn:not(.no-hide),
+  .subnav,.tk-top-r,.prop-layout>div:first-child,.stats{display:none!important}
+  body{background:white}.page{padding:0;max-width:100%}
+  .dp{box-shadow:none;border:1px solid #ccc}.prop-layout{grid-template-columns:1fr}
+}
+@media(max-width:700px){
+  .prop-layout{grid-template-columns:1fr}.frow,.igrid{grid-template-columns:1fr}
+  .page{padding:16px}.hdr{padding:0 16px}.tabs{padding:0 16px}.tk-top-r{width:100%}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+var App = {
+  loading: true,
+  data: {
+    settings: {hoaName:'HOA Manager',duesAmount:'0',duesDueDate:'',hoaPhone:'',hoaAddress:'',appUrl:''},
+    properties:[], tasks:[], templates:[], members:[], vendors:[], minutes:[]
+  },
+  selectedId: null,
+  tab: 'properties',   // properties | tasks | board | reports
+  tasksView: 'year',   // year | templates
+  boardView: 'members', // members | vendors | minutes
+  modal: null,
+  taskYear: new Date().getFullYear(),
+  propSearch: '',
+  showInactive: false
+};
+var MOS = ['January','February','March','April','May','June',
+           'July','August','September','October','November','December'];
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+function h(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fdt(d){
+  if(!d)return '—';var p=String(d).split('-');if(p.length!==3)return d;
+  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+p[1]-1]+' '+parseInt(p[2])+', '+p[0];
+}
+function today(){var d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());}
+function p2(n){return('0'+n).slice(-2);}
+function gv(id){var e=document.getElementById(id);return e?e.value.trim():'';}
+function gc(id){var e=document.getElementById(id);return e?e.checked:false;}
+function moName(m){return parseInt(m)>0?MOS[parseInt(m)-1]:'Unscheduled';}
+function duesBadge(s){
+  if(s==='paid')return '<span class="bdg b-pd">Paid</span>';
+  if(s==='partial')return '<span class="bdg b-pt">Partial</span>';
+  return '<span class="bdg b-un">Unpaid</span>';
+}
+function stBadge(s){
+  if(s==='inactive')return '<span class="bdg b-in">Inactive</span>';
+  if(s==='sold')return '<span class="bdg b-sd">Sold</span>';
+  return '';
+}
+function dueBadge(due,st){
+  if(st==='done'||!due)return '';
+  var df=Math.ceil((new Date(due+'T12:00:00')-new Date())/86400000);
+  if(df<0)return '<span class="t-due late">Overdue</span>';
+  if(df<=14)return '<span class="t-due soon">Due '+fdt(due)+'</span>';
+  return '<span class="t-due ok">'+fdt(due)+'</span>';
+}
+function calcBal(prop){
+  var amt=parseFloat(App.data.settings.duesAmount)||0;
+  if(!amt)return null;
+  var yr=new Date().getFullYear();
+  var paid=(prop.payments||[])
+    .filter(function(pm){return String((pm.date||'').substring(0,4))===String(yr);})
+    .reduce(function(s,pm){return s+parseFloat(pm.amount||0);},0);
+  return {assessed:amt,paid:paid,balance:amt-paid};
+}
+function fmt$(n){return '$'+(parseFloat(n)||0).toFixed(2);}
+
+// ─── LOOKUP MAP ───────────────────────────────────────────────────────────────
+var _map={};
+function _reg(obj){if(obj&&obj.id)_map[obj.id]=obj;return obj;}
+function openModalById(type,id){App.modal={type:type,payload:_map[id]||{}};render();}
+
+// ─── DATA ─────────────────────────────────────────────────────────────────────
+// silent=true: don't show spinner (safe to call from inside google.script.run callbacks)
+// silent=false (default): show spinner first (safe for initial page load)
+function loadData(cb, silent){
+  if(!silent){ App.loading=true; render(); }
+  google.script.run
+    .withSuccessHandler(function(d){
+      App.data=d; App.loading=false;
+      setTimeout(function(){ if(cb)cb(d); else render(); }, 0);
+    })
+    .withFailureHandler(function(e){
+      App.loading=false;
+      var msg=e.message||e;
+      setTimeout(function(){ render(); alert('Load error: '+msg); }, 0);
+    })
+    .getAllData();
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function render(){
+  var root=document.getElementById('app');if(!root)return;
+  if(App.loading){root.innerHTML='<div class="spin-wrap"><div class="spinner"></div><p>Loading…</p></div>';return;}
+  _map={};
+  // Pre-register all data objects for safe onclick lookups
+  App.data.properties.forEach(function(p){
+    _reg(p);
+    (p.payments||[]).forEach(function(pm){_reg(pm);});
+    (p.violations||[]).forEach(function(v){
+      _reg(v);
+      // composite for violation notice
+      var vnk='vn-'+v.id;
+      _map[vnk]={id:vnk,prop:p,viol:v};
+    });
+    (p.docs||[]).forEach(function(d){_reg(d);});
+    // add-doc payload key
+    var dk='adddoc-'+p.id;
+    _map[dk]={id:dk,propertyId:p.id,address:p.address};
+  });
+  App.data.tasks.forEach(function(t){_reg(t);});
+  App.data.templates.forEach(function(t){_reg(t);});
+  App.data.members.forEach(function(m){_reg(m);});
+  App.data.vendors.forEach(function(v){_reg(v);});
+  App.data.minutes.forEach(function(m){_reg(m);});
+
+  var html=renderHeader()+renderTabs()+'<div class="page">';
+  if(App.tab==='properties')html+=renderPropsTab();
+  else if(App.tab==='tasks')html+=renderTasksTab();
+  else if(App.tab==='board')html+=renderBoardTab();
+  else html+=renderReportsTab();
+  html+='</div>';
+  if(App.modal)html+=renderModal();
+  root.innerHTML=html;
+
+  // Restore search focus
+  if(App.tab==='properties'&&App.propSearch){
+    var el=document.getElementById('propSearch');
+    if(el){el.focus();el.setSelectionRange(App.propSearch.length,App.propSearch.length);}
+  }
+}
+
+// ─── HEADER ───────────────────────────────────────────────────────────────────
+function renderHeader(){
+  var name=h(App.data.settings.hoaName||'HOA Manager');
+  var raw=(App.data.settings.hoaName||'HOA Manager');
+  var initials=raw.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+  var appUrl=App.data.settings.appUrl||'';
+  var urlDisplay='';
+  if(appUrl){
+    // Show just the domain+path, strip protocol for display
+    var display=appUrl.replace(/^https?:\/\//,'');
+    urlDisplay=' · <a href="'+h(appUrl)+'" target="_blank" style="color:var(--ind);text-decoration:none;font-weight:500">🔗 '+h(display)+'</a>';
+  }
+  var btn='';
+  if(App.tab==='properties') btn='<button class="btn btn-p btn-sm" onclick="openModal(\'addProperty\',{})">+ Add Property</button>';
+  else if(App.tab==='tasks'){
+    if(App.tasksView==='templates') btn='<button class="btn btn-p btn-sm" onclick="openModal(\'addTemplate\',{})">+ Add Template</button>';
+    else btn='<button class="btn btn-p btn-sm" onclick="openModal(\'addTask\',{})">+ Add Task</button>';
+  } else if(App.tab==='board'){
+    if(App.boardView==='members') btn='<button class="btn btn-p btn-sm" onclick="openModal(\'addMember\',{})">+ Add Member</button>';
+    else if(App.boardView==='vendors') btn='<button class="btn btn-p btn-sm" onclick="openModal(\'addVendor\',{})">+ Add Vendor</button>';
+    else btn='<button class="btn btn-p btn-sm" onclick="openModal(\'addMinutes\',{})">+ Add Minutes</button>';
+  }
+  return '<div class="hdr"><div class="hdr-l">'+
+    '<div class="hdr-logo">'+initials+'</div>'+
+    '<div><div class="hdr-title">'+name+'</div><div class="hdr-sub">HOA Management'+urlDisplay+'</div></div></div>'+
+    '<div class="hdr-r">'+
+    '<button class="btn btn-g btn-sm" onclick="openModal(\'settings\',{})">⚙ Settings</button>'+
+    '<button class="btn btn-g btn-sm" onclick="window.print()">🖨 Print</button>'+
+    btn+'</div></div>';
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function renderTabs(){
+  var labels={properties:'🏡 Properties',tasks:'📋 Tasks',board:'👥 Board & Info',reports:'📊 Reports'};
+  return '<div class="tabs">'+['properties','tasks','board','reports'].map(function(t){
+    return '<div class="tab'+(App.tab===t?' on':'')+'" onclick="switchTab(\''+t+'\')">'+labels[t]+'</div>';
+  }).join('')+'</div>';
+}
+
+// ─── PROPERTIES TAB ───────────────────────────────────────────────────────────
+function renderPropsTab(){
+  var props=App.data.properties;
+  var active=props.filter(function(p){return p.status==='active';});
+  var paid=active.filter(function(p){return p.duesStatus==='paid';}).length;
+  var unpaid=active.filter(function(p){return p.duesStatus!=='paid';}).length;
+  var viols=active.reduce(function(a,p){return a+(p.violations||[]).filter(function(v){return v.status==='open';}).length;},0);
+  var stats='<div class="stats">'+
+    sc('Active Properties',active.length,'vi')+sc('Dues Paid',paid,'vg')+
+    sc('Dues Unpaid',unpaid,'vr')+sc('Open Violations',viols,viols>0?'vr':'')+
+    '</div>';
+
+  var filtered=props.filter(function(p){
+    if(!App.showInactive&&p.status!=='active')return false;
+    if(!App.propSearch)return true;
+    var q=App.propSearch.toLowerCase();
+    return (p.address+' '+(p.ownerName||'')+' '+(p.lotNumber||'')).toLowerCase().indexOf(q)>-1;
+  });
+
+  // Auto-select
+  if(!App.selectedId||!filtered.find(function(p){return p.id===App.selectedId;})){
+    App.selectedId=filtered.length?filtered[0].id:null;
+  }
+  var sp=filtered.find(function(p){return p.id===App.selectedId;})||null;
+
+  var list='<div>'+
+    '<input class="search-inp" id="propSearch" type="text" placeholder="🔍 Search address, owner, lot…" value="'+h(App.propSearch)+'" oninput="App.propSearch=this.value;render()">'+
+    '<label class="filter-row"><input type="checkbox"'+(App.showInactive?' checked':'')+' onchange="App.showInactive=this.checked;render()"> Show inactive / sold</label>'+
+    '<div class="list-lbl">'+filtered.length+' propert'+(filtered.length===1?'y':'ies')+'</div>'+
+    '<div class="prop-list">';
+  filtered.forEach(function(p){
+    var ov=(p.violations||[]).filter(function(v){return v.status==='open';}).length;
+    var bal=calcBal(p);
+    var balStr=bal&&bal.assessed?' · '+fmt$(bal.paid)+'/'+fmt$(bal.assessed):'';
+    list+='<div class="pc'+(p.id===App.selectedId?' on':'')+(p.status!=='active'?' dim':'')+'" onclick="selectProp(\''+h(p.id)+'\')">'+
+      '<div class="pc-addr">'+h(p.address)+(p.lotNumber?' <span style="font-weight:400;color:var(--mu)">Lot '+h(p.lotNumber)+'</span>':'')+'</div>'+
+      '<div class="pc-owner">'+h(p.ownerName)+balStr+'</div>'+
+      '<div class="pc-bdg">'+duesBadge(p.duesStatus)+
+      (ov?'<span class="bdg b-vl">⚠ '+ov+'</span>':'')+
+      (p.ownerOccupied==='no'?'<span class="bdg b-nr">Non-res</span>':'')+
+      stBadge(p.status)+
+      '</div></div>';
+  });
+  list+='</div></div>';
+
+  var detail=sp?renderDetail(sp):'<div class="empty-st"><p>Select a property to view details.</p></div>';
+  if(!filtered.length)detail='<div class="empty-st"><p>No properties match your search.</p></div>';
+
+  return stats+'<div class="prop-layout">'+list+'<div>'+detail+'</div></div>';
+}
+function sc(label,val,cls){return '<div class="stat"><div class="s-lbl">'+label+'</div><div class="s-val '+(cls||'')+'">'+ val+'</div></div>';}
+
+function renderDetail(p){
+  var pmts=p.payments||[],viols=p.violations||[],docs=p.docs||[];
+  var ov=viols.filter(function(v){return v.status==='open';}).length;
+  var nr=p.ownerOccupied==='no';
+  var bal=calcBal(p);
+
+  var html='<div class="dp">'+
+    '<div class="dp-hdr"><div>'+
+    '<div class="dp-addr">'+h(p.address)+(p.lotNumber?' <span style="font-size:13px;font-weight:400;color:var(--mu)">· Lot '+h(p.lotNumber)+'</span>':'')+'</div>'+
+    '<div class="dp-sub">'+h(p.ownerName)+
+    (nr?' <span class="bdg b-nr">Non-resident owner</span>':'')+
+    stBadge(p.status)+
+    '</div></div>'+
+    '<div class="dp-acts">'+
+    '<button class="btn btn-s btn-sm" onclick="openModalById(\'editProperty\',\''+h(p.id)+'\')">Edit</button>'+
+    '<button class="btn btn-d btn-sm" onclick="doDeleteProperty(\''+h(p.id)+'\')">Remove</button>'+
+    '</div></div>';
+
+  // Balance strip
+  if(bal){
+    var balColor = bal.balance > 0 ? 'vr' : 'vg';
+    var balLabel = bal.balance < 0 ? 'Overpaid' : (bal.balance === 0 ? 'Paid in Full' : 'Balance Due');
+    var balDisplay = bal.balance < 0 ? '('+fmt$(-bal.balance)+')' : fmt$(bal.balance);
+    html+='<div class="bal-strip">'+
+      '<div class="bal-cell"><div class="bal-lbl">Annual Dues</div><div class="bal-val">'+fmt$(bal.assessed)+'</div></div>'+
+      '<div class="bal-cell"><div class="bal-lbl">Paid ('+new Date().getFullYear()+')</div><div class="bal-val vg">'+fmt$(bal.paid)+'</div></div>'+
+      '<div class="bal-cell"><div class="bal-lbl">'+balLabel+'</div><div class="bal-val '+balColor+'">'+balDisplay+'</div></div>'+
+      '</div>';
+  }
+
+  html+='<div class="dp-body">';
+
+  // Owner info
+  html+='<div class="dp-sec"><div class="dp-shd"><span>Owner & Property</span></div>'+
+    '<div class="igrid">'+
+    ii('Owner',p.ownerName)+ii('Email',p.ownerEmail)+
+    ii('Phone',p.ownerPhone)+ii('Move-in',fdt(p.moveInDate))+
+    ii('Dues Status',duesBadge(p.duesStatus))+ii('Owner Occupied',nr?'No — non-resident':'Yes')+
+    (p.notes?'<div style="grid-column:1/-1">'+ik('Notes')+iv(p.notes)+'</div>':'')+
+    '</div>';
+  if(nr&&(p.contactName||p.contactPhone||p.contactEmail||p.contactAddress)){
+    html+='<div class="cbox"><div class="cbox-lbl">📞 Non-Resident Contact</div>'+
+      '<div class="igrid" style="grid-template-columns:1fr 1fr 1fr">'+
+      ii('Name',p.contactName)+ii('Phone',p.contactPhone)+ii('Email',p.contactEmail)+
+      (p.contactAddress?'<div style="grid-column:1/-1">'+ik('Mailing Address')+iv(p.contactAddress)+'</div>':'')+
+      '</div></div>';
+  }
+  html+='</div>';
+
+  // Payments
+  html+='<div class="dp-sec"><div class="dp-shd"><span>Payments</span>'+
+    '<button class="btn btn-s btn-sm" onclick="openModalById(\'addPayment\',\''+h(p.id)+'\')">+ Add Payment</button></div>';
+  if(!pmts.length){html+='<p style="font-size:13px;color:var(--mu);padding:8px 0">No payments yet.</p>';}
+  else{
+    html+='<table class="tbl"><thead><tr><th>Date</th><th>Period</th><th>Amount</th><th>Status</th><th>Note</th><th></th></tr></thead><tbody>';
+    pmts.slice().reverse().forEach(function(pm){
+      html+='<tr><td>'+fdt(pm.date)+'</td><td>'+h(pm.period||'—')+'</td>'+
+        '<td style="font-weight:600">'+fmt$(pm.amount)+'</td><td>'+duesBadge(pm.status)+'</td>'+
+        '<td style="color:var(--mu)">'+h(pm.note||'')+'</td>'+
+        '<td><button class="bico" onclick="doDeletePayment(\''+h(pm.id)+'\')">✕</button></td></tr>';
+    });
+    html+='</tbody></table>';
+  }
+  html+='</div>';
+
+  // Violations
+  html+='<div class="dp-sec"><div class="dp-shd">'+
+    '<span>Violations & Notes'+(ov?' <span class="bdg b-vl">'+ov+' open</span>':'')+'</span>'+
+    '<button class="btn btn-s btn-sm" onclick="openModalById(\'addViolation\',\''+h(p.id)+'\')">+ Add</button></div>';
+  if(!viols.length){html+='<p style="font-size:13px;color:var(--mu);padding:8px 0">No violations on record.</p>';}
+  else viols.slice().reverse().forEach(function(v){
+    html+='<div class="vc"><div>'+
+      '<div class="vc-dt">'+fdt(v.date)+'</div>'+
+      '<div class="vc-tx">'+h(v.description)+'</div>'+
+      '<div class="vc-st '+h(v.status)+'">'+(v.status==='open'?'● Open':'✓ Resolved')+'</div></div>'+
+      '<div class="vc-acts">'+
+      (v.status==='open'?'<button class="bico" title="Generate Notice" onclick="openModalById(\'violNotice\',\'vn-'+h(v.id)+'\')">📄</button>':'')+
+      '<button class="bico" onclick="doDeleteViolation(\''+h(v.id)+'\')">✕</button>'+
+      '</div></div>';
+  });
+  html+='</div>';
+
+  // Document log
+  html+='<div class="dp-sec"><div class="dp-shd"><span>Document Log</span>'+
+    '<button class="btn btn-s btn-sm" onclick="openModalById(\'addDoc\',\'adddoc-'+h(p.id)+'\')">+ Add Entry</button></div>';
+  if(!docs.length){html+='<p style="font-size:13px;color:var(--mu);padding:8px 0">No document log entries yet.<br><span style="font-size:12px">Use this for letters sent, certified mail tracking numbers, phone call records, etc.</span></p>';}
+  else{
+    html+='<div>';
+    docs.slice().reverse().forEach(function(d){
+      html+='<div class="doc-row">'+
+        '<span class="doc-dt">'+fdt(d.date)+'</span>'+
+        '<span class="doc-tx">'+h(d.description)+'</span>'+
+        '<button class="bico" onclick="doDeleteDoc(\''+h(d.id)+'\')">✕</button>'+
+        '</div>';
+    });
+    html+='</div>';
+  }
+  html+='</div>';
+
+  return html+'</div></div>';
+}
+function ii(lbl,val){return '<div>'+ik(lbl)+iv(val)+'</div>';}
+function ik(l){return '<div class="ik">'+l+'</div>';}
+function iv(v){return '<div class="iv">'+(v||'—')+'</div>';}
+
+// ─── TASKS TAB ────────────────────────────────────────────────────────────────
+function renderTasksTab(){
+  return App.tasksView==='templates'?renderTemplatesView():renderYearView();
+}
+function renderYearView(){
+  var yr=App.taskYear;
+  var yt=App.data.tasks.filter(function(t){return String(t.year)===String(yr);});
+  var done=yt.filter(function(t){return t.status==='done';}).length;
+  var pct=yt.length?Math.round(done/yt.length*100):0;
+  var tc=App.data.templates.length;
+  var html='<div class="tk-top"><div class="tk-top-l"><h2>'+yr+' Task List</h2>'+
+    '<p>'+done+' of '+yt.length+' complete</p></div>'+
+    '<div class="tk-top-r">'+
+    '<div class="yr-nav"><button class="btn btn-s btn-sm" onclick="App.taskYear--;render()">◀</button>'+
+    '<span class="yr-val">'+yr+'</span>'+
+    '<button class="btn btn-s btn-sm" onclick="App.taskYear++;render()">▶</button></div>'+
+    '<button class="load-btn" onclick="doLoadYear()">⬇ Load '+yr+' from Template</button>'+
+    '<button class="btn btn-g btn-sm" onclick="App.tasksView=\'templates\';render()">✎ Template ('+tc+')</button>'+
+    '</div></div>';
+  html+='<div class="prog-bar"><div class="prog-fill" style="width:'+pct+'%"></div></div>';
+  var byMo={};
+  yt.forEach(function(t){var m=parseInt(t.month)||0;if(!byMo[m])byMo[m]=[];byMo[m].push(t);});
+  var any=false;
+  [1,2,3,4,5,6,7,8,9,10,11,12,0].forEach(function(m){
+    var ts=byMo[m];if(!ts||!ts.length)return;any=true;
+    var md=ts.filter(function(t){return t.status==='done';}).length;
+    html+='<div class="mo-block"><div class="mo-head"><span>'+moName(m)+'</span><span>'+md+'/'+ts.length+'</span></div>';
+    ts.forEach(function(t){
+      var isDone=t.status==='done';
+      html+='<div class="tk-row'+(isDone?' done':'')+'">'+
+        '<div class="t-chk'+(isDone?' on':'')+'" onclick="doToggleTask(\''+h(t.id)+'\','+isDone+')">'+(isDone?'✓':'')+'</div>'+
+        '<div><div class="t-dsc">'+h(t.description)+'</div>'+(t.notes?'<div class="t-sub">'+h(t.notes)+'</div>':'')+'</div>'+
+        '<div class="t-asgn">'+h(t.assignee||'')+'</div>'+
+        dueBadge(t.dueDate,t.status)+
+        '<div class="t-acts"><button class="bico" onclick="openModalById(\'editTask\',\''+h(t.id)+'\')">✎</button>'+
+        '<button class="bico" onclick="doDeleteTask(\''+h(t.id)+'\')">✕</button></div></div>';
+    });
+    html+='</div>';
+  });
+  if(!any)html+='<div class="empty-st"><div class="ico">📋</div><p>No tasks for '+yr+' yet.<br>Click <strong>"⬇ Load '+yr+' from Template"</strong> to populate,<br>or click "+ Add Task" to add one manually.</p></div>';
+  return html;
+}
+function renderTemplatesView(){
+  var ts=App.data.templates;
+  var html='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">'+
+    '<div><h2 style="font-size:16px;font-weight:600">Annual Task Template</h2>'+
+    '<p style="font-size:12px;color:var(--mu);margin-top:2px">Recurring tasks loaded each year with one click</p></div>'+
+    '<button class="btn btn-s btn-sm" onclick="App.tasksView=\'year\';render()">← Back to '+App.taskYear+'</button></div>';
+  html+='<div class="tmpl-note">You have <strong>'+ts.length+' template task'+(ts.length!==1?'s':'')+'</strong>. These are copied into any year when you click "Load from Template" — already-existing tasks are skipped.</div>';
+  if(!ts.length)return html+'<div class="empty-st"><div class="ico">📝</div><p>No template tasks yet.<br>Click "+ Add Template" to build your annual checklist.</p></div>';
+  var byMo={};
+  ts.forEach(function(t){var m=parseInt(t.month)||0;if(!byMo[m])byMo[m]=[];byMo[m].push(t);});
+  [1,2,3,4,5,6,7,8,9,10,11,12,0].forEach(function(m){
+    var items=byMo[m];if(!items||!items.length)return;
+    html+='<div class="mo-block"><div class="mo-head"><span>'+moName(m)+'</span><span>'+items.length+'</span></div>';
+    items.forEach(function(t){
+      html+='<div class="tk-row"><div class="t-chk" style="cursor:default;opacity:.3"></div>'+
+        '<div><div class="t-dsc">'+h(t.description)+'</div>'+(t.notes?'<div class="t-sub">'+h(t.notes)+'</div>':'')+'</div>'+
+        '<div class="t-asgn">'+h(t.assignee||'')+'</div><div></div>'+
+        '<div class="t-acts"><button class="bico" onclick="openModalById(\'editTemplate\',\''+h(t.id)+'\')">✎</button>'+
+        '<button class="bico" onclick="doDeleteTemplate(\''+h(t.id)+'\')">✕</button></div></div>';
+    });
+    html+='</div>';
+  });
+  return html;
+}
+
+// ─── BOARD TAB ────────────────────────────────────────────────────────────────
+function renderBoardTab(){
+  var views={members:'👤 Members',vendors:'🔧 Vendors',minutes:'📝 Minutes'};
+  var html='<div class="subnav">'+Object.entries(views).map(function(e){
+    return '<div class="stab'+(App.boardView===e[0]?' on':'')+'" onclick="App.boardView=\''+e[0]+'\';render()">'+e[1]+'</div>';
+  }).join('')+'</div>';
+  if(App.boardView==='members')html+=renderMembers();
+  else if(App.boardView==='vendors')html+=renderVendors();
+  else html+=renderMins();
+  return html;
+}
+function renderMembers(){
+  var ms=App.data.members;
+  if(!ms.length)return '<div class="empty-st"><div class="ico">👤</div><p>No board members yet.<br>Click "+ Add Member" to add them.</p></div>';
+  return ms.map(function(m){
+    return '<div class="bc"><div class="bc-info">'+
+      '<div class="bc-name">'+h(m.name)+'</div>'+
+      '<div class="bc-role">'+h(m.role||'Board Member')+'</div>'+
+      '<div class="bc-dtl">'+
+      (m.email?'✉ '+h(m.email)+'<br>':'')+
+      (m.phone?'📞 '+h(m.phone)+'<br>':'')+
+      (m.termEnd?'Term ends: '+fdt(m.termEnd)+'<br>':'')+
+      (m.notes?h(m.notes):'')+
+      '</div></div>'+
+      '<div class="bc-acts">'+
+      '<button class="bico" onclick="openModalById(\'editMember\',\''+h(m.id)+'\')">✎</button>'+
+      '<button class="bico" onclick="doDeleteMember(\''+h(m.id)+'\')">✕</button>'+
+      '</div></div>';
+  }).join('');
+}
+function renderVendors(){
+  var vs=App.data.vendors;
+  if(!vs.length)return '<div class="empty-st"><div class="ico">🔧</div><p>No vendors yet.<br>Click "+ Add Vendor" to add contractors, landscapers, etc.</p></div>';
+  return '<table class="tbl"><thead><tr><th>Name</th><th>Category</th><th>Phone</th><th>Email</th><th>Notes</th><th></th></tr></thead><tbody>'+
+    vs.map(function(v){
+      return '<tr><td style="font-weight:600">'+h(v.name)+'</td><td>'+h(v.category||'—')+'</td>'+
+        '<td>'+h(v.phone||'—')+'</td><td>'+h(v.email||'—')+'</td>'+
+        '<td style="color:var(--mu)">'+h(v.notes||'')+'</td>'+
+        '<td style="white-space:nowrap"><button class="bico" onclick="openModalById(\'editVendor\',\''+h(v.id)+'\')">✎</button>'+
+        '<button class="bico" onclick="doDeleteVendor(\''+h(v.id)+'\')">✕</button></td></tr>';
+    }).join('')+'</tbody></table>';
+}
+function renderMins(){
+  var ms=App.data.minutes;
+  if(!ms.length)return '<div class="empty-st"><div class="ico">📝</div><p>No meeting minutes yet.<br>Click "+ Add Minutes" after each board meeting.</p></div>';
+  return ms.slice().sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}).map(function(m){
+    return '<div class="min-card">'+
+      '<div class="min-hdr"><div>'+
+      '<div class="min-dt">'+fdt(m.date)+'</div>'+
+      '<div class="min-title">'+h(m.title||'Board Meeting')+'</div>'+
+      '</div><div style="display:flex;gap:4px">'+
+      '<button class="bico" onclick="openModalById(\'editMinutes\',\''+h(m.id)+'\')">✎</button>'+
+      '<button class="bico" onclick="doDeleteMinutes(\''+h(m.id)+'\')">✕</button>'+
+      '</div></div>'+
+      (m.attendees?'<div class="min-att">Attendees: '+h(m.attendees)+'</div>':'')+
+      (m.notes?'<div class="min-notes">'+h(m.notes)+'</div>':'')+
+      '</div>';
+  }).join('');
+}
+
+// ─── REPORTS TAB ─────────────────────────────────────────────────────────────
+function renderReportsTab(){
+  var props=App.data.properties;
+  var active=props.filter(function(p){return p.status==='active';});
+  var unpaid=active.filter(function(p){return p.duesStatus!=='paid';});
+  var openV=[];
+  active.forEach(function(p){
+    (p.violations||[]).filter(function(v){return v.status==='open';})
+      .forEach(function(v){openV.push({v:v,addr:p.address,owner:p.ownerName});});
+  });
+
+  var html='';
+
+  // Email merge
+  var allEmails=active.filter(function(p){return p.ownerEmail;}).map(function(p){return p.ownerEmail;});
+  var unpaidEmails=unpaid.filter(function(p){return p.ownerEmail;}).map(function(p){return p.ownerEmail;});
+  var nrEmails=active.filter(function(p){return p.ownerOccupied==='no'&&p.contactEmail;}).map(function(p){return p.contactEmail;});
+  html+='<div class="rpt-sec"><div class="rpt-hd"><h3>📧 Email Lists</h3><span style="font-size:12px;color:var(--mu)">Click Copy to get a BCC-ready list</span></div><div class="rpt-body">'+
+    emailRow('All Active Owners',allEmails)+
+    emailRow('Unpaid / Partial Only',unpaidEmails)+
+    emailRow('Non-Resident Contacts',nrEmails)+
+    '</div></div>';
+
+  // Bulk actions
+  html+='<div class="rpt-sec"><div class="rpt-hd"><h3>⚡ Bulk Actions</h3></div><div class="rpt-body" style="display:flex;gap:12px;flex-wrap:wrap">'+
+    '<div><p style="font-size:13px;color:var(--sl2);margin-bottom:8px">Reset all active properties to <strong>Unpaid</strong> at the start of a new dues year.</p>'+
+    '<button class="btn btn-w" onclick="doBulkReset()">↺ Reset All Dues to Unpaid</button></div>'+
+    '</div></div>';
+
+  // Dues summary
+  var duesAmt=parseFloat(App.data.settings.duesAmount)||0;
+  var totalAssessed=active.length*duesAmt;
+  var totalCollected=active.reduce(function(s,p){
+    var yr=new Date().getFullYear();
+    return s+(p.payments||[]).filter(function(pm){return String((pm.date||'').substring(0,4))===String(yr);})
+      .reduce(function(a,pm){return a+parseFloat(pm.amount||0);},0);
+  },0);
+  html+='<div class="rpt-sec"><div class="rpt-hd"><h3>💰 Dues Summary</h3></div><div class="rpt-body">'+
+    '<div class="igrid" style="margin-bottom:16px">'+
+    ri('Active Properties',active.length)+
+    ri('Fully Paid',active.filter(function(p){return p.duesStatus==='paid';}).length)+
+    ri('Unpaid / Partial',unpaid.length)+
+    (duesAmt?ri('Annual Dues Rate',fmt$(duesAmt)+'/property'):'')+
+    (duesAmt?ri('Total Assessed ('+new Date().getFullYear()+')',fmt$(totalAssessed)):'')+
+    (duesAmt?ri('Total Collected ('+new Date().getFullYear()+')',fmt$(totalCollected)):'')+
+    '</div>';
+  if(unpaid.length){
+    html+='<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mu);margin-bottom:8px">Unpaid Properties</div>';
+    unpaid.forEach(function(p){
+      html+='<div style="padding:6px 0;border-bottom:1px solid var(--bdr);font-size:13px;display:flex;justify-content:space-between">'+
+        '<span>'+h(p.address)+' — '+h(p.ownerName)+'</span>'+
+        '<span>'+duesBadge(p.duesStatus)+'</span></div>';
+    });
+  }
+  html+='</div></div>';
+
+  // Open violations
+  html+='<div class="rpt-sec"><div class="rpt-hd"><h3>⚠ Open Violations ('+openV.length+')</h3></div><div class="rpt-body">';
+  if(!openV.length)html+='<p style="font-size:13px;color:var(--mu)">No open violations ✓</p>';
+  else openV.forEach(function(x){
+    html+='<div class="vc"><div><div class="vc-dt">'+h(x.addr)+' · '+fdt(x.v.date)+'</div>'+
+      '<div class="vc-tx">'+h(x.v.description)+'</div></div></div>';
+  });
+  html+='</div></div>';
+
+  // Export
+  html+='<div class="rpt-sec"><div class="rpt-hd"><h3>⬇ Export Data</h3></div><div class="rpt-body" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">'+
+    '<button class="btn btn-p" onclick="doExportJSON()">Full Data (JSON)</button>'+
+    '<button class="btn btn-s" onclick="doExportCSV()">Properties Summary (CSV)</button>'+
+    '<span style="font-size:12px;color:var(--mu);font-style:italic">JSON includes all payments, tasks, and board info.</span>'+
+    '</div></div>';
+
+  return html;
+}
+function emailRow(label,emails){
+  var str=emails.join('; ');
+  var key='email-'+label.replace(/\W+/g,'');
+  _map[key]={id:key,text:str};
+  return '<div class="email-row">'+
+    '<div style="flex:1"><div style="font-size:13px;font-weight:500">'+label+'</div>'+
+    '<div class="copy-box">'+(str?h(str):'<em>No emails on file</em>')+'</div></div>'+
+    '<button class="btn btn-s btn-sm" onclick="doCopyById(\''+key+'\')"'+(str?'':' disabled style="opacity:.4"')+'>Copy</button>'+
+    '</div>';
+}
+function ri(lbl,val){return '<div>'+ik(lbl)+iv(val)+'</div>';}
+
+// ─── MODAL ────────────────────────────────────────────────────────────────────
+function renderModal(){
+  var t=App.modal.type,p=App.modal.payload||{};
+  var title='',body='',saveLabel='Save',saveFn='';
+
+  if(t==='settings'){
+    title='⚙ HOA Settings'; saveFn='doSaveSettings()';
+    var s=App.data.settings;
+    body=fg('HOA Name','f-hoaNm',s.hoaName,'text','Maple Ridge HOA')+
+      '<div class="frow">'+fg('Annual Dues Amount ($)','f-duesAmt',s.duesAmount,'number','300.00')+
+      fg('Dues Due Date','f-duesDue',s.duesDueDate,'text','March 1')+'</div>'+
+      fg('HOA Mailing Address','f-hoaAddr',s.hoaAddress,'text','123 Main St, City, ST 00000')+
+      fg('HOA Phone','f-hoaPhone',s.hoaPhone,'tel','(555) 000-0000')+
+      fg('App Short URL (shown in header)','f-appUrl',s.appUrl,'url','https://tinyurl.com/ridgehoa');
+  }
+  else if(t==='addProperty'||t==='editProperty'){
+    title=t==='addProperty'?'Add Property':'Edit Property'; saveFn='doSaveProperty()';
+    var nr=p.ownerOccupied==='no';
+    body='<div class="frow">'+fg('Street Address *','f-addr',p.address,'text','123 Maple St')+fg('Lot #','f-lot',p.lotNumber,'text','42')+'</div>'+
+      '<div class="sdiv">Owner Information</div>'+
+      '<div class="frow">'+fg('Owner Name *','f-owNm',p.ownerName,'text','Jane Doe')+fg('Move-in Date','f-mvIn',p.moveInDate,'date','')+'</div>'+
+      '<div class="frow">'+fg('Owner Email','f-owEm',p.ownerEmail,'email','')+fg('Owner Phone','f-owPh',p.ownerPhone,'tel','')+'</div>'+
+      '<div class="frow">'+fgS('Dues Status','f-dues',[['paid','Paid'],['unpaid','Unpaid'],['partial','Partial']],p.duesStatus||'unpaid')+
+      fgS('Property Status','f-status',[['active','Active'],['inactive','Inactive'],['sold','Sold / Transferred']],p.status||'active')+'</div>'+
+      '<div class="tgl"><input type="checkbox" id="f-nr"'+(nr?' checked':'')+' onchange="toggleNR()">'+
+      '<label for="f-nr">Owner does <strong>not</strong> live at this property</label></div>'+
+      '<div id="nrFields" style="display:'+(nr?'block':'none')+'">'+
+      '<div class="sdiv">Non-Resident Contact</div>'+
+      '<div class="frow">'+fg('Contact Name','f-cNm',p.contactName,'text','')+fg('Contact Phone','f-cPh',p.contactPhone,'tel','')+'</div>'+
+      '<div class="frow">'+fg('Contact Email','f-cEm',p.contactEmail,'email','')+fg('Contact Address','f-cAd',p.contactAddress,'text','')+'</div>'+
+      '</div>'+fg('Notes','f-notes',p.notes,'text','');
+  }
+  else if(t==='addPayment'){
+    title='Add Payment — '+h(p.address||''); saveFn='doSavePayment()';
+    body='<div class="frow">'+fg('Date','f-pmDt',today(),'date','')+fg('Period (e.g. Q1 2026)','f-pmPd','','text','Q1 2026')+'</div>'+
+      '<div class="frow">'+fg('Amount ($)','f-pmAm','','number','250.00')+
+      fgS('Status','f-pmSt',[['paid','Paid'],['partial','Partial'],['unpaid','Unpaid / Missed']],'paid')+'</div>'+
+      fg('Note','f-pmNt','','text','Check #, bank transfer…');
+  }
+  else if(t==='addViolation'){
+    title='Add Violation / Note — '+h(p.address||''); saveFn='doSaveViolation()';
+    body='<div class="frow">'+fg('Date','f-viDt',today(),'date','')+
+      fgS('Status','f-viSt',[['open','Open'],['resolved','Resolved']],'open')+'</div>'+
+      '<div class="fg"><label>Description *</label><textarea id="f-viDsc" rows="3" placeholder="Describe the violation…"></textarea></div>';
+  }
+  else if(t==='addDoc'){
+    title='Add Document Log Entry — '+h(p.address||''); saveFn='doSaveDoc()';
+    body=fg('Date','f-dcDt',today(),'date','')+
+      '<div class="fg"><label>Description *</label><textarea id="f-dcDsc" rows="3" placeholder="e.g. Sent violation notice via certified mail, tracking #12345"></textarea></div>';
+  }
+  else if(t==='addTask'||t==='editTask'){
+    title=t==='addTask'?'Add Task':'Edit Task'; saveFn='doSaveTask(\''+t+'\')';
+    body='<div class="frow">'+
+      fgS('Month','f-tkMo',[['0','Unscheduled']].concat(MOS.map(function(m,i){return [String(i+1),m];})),String(p.month||'0'))+
+      fg('Year','f-tkYr',p.year||String(App.taskYear),'number','')+'</div>'+
+      '<div class="fg"><label>Description *</label><textarea id="f-tkDsc" rows="2" placeholder="What needs to be done?">'+h(p.description||'')+'</textarea></div>'+
+      '<div class="frow">'+fg('Assigned To','f-tkAsgn',p.assignee,'text','')+fg('Due Date','f-tkDue',p.dueDate,'date','')+'</div>'+
+      fgS('Status','f-tkSt',[['pending','Pending'],['done','Done']],p.status||'pending')+
+      fg('Notes','f-tkNts',p.notes,'text','');
+  }
+  else if(t==='addTemplate'||t==='editTemplate'){
+    title=t==='addTemplate'?'Add Template Task':'Edit Template Task'; saveFn='doSaveTemplate(\''+t+'\')';
+    body=fgS('Month','f-tmMo',[['0','Unscheduled']].concat(MOS.map(function(m,i){return [String(i+1),m];})),String(p.month||'0'))+
+      '<div class="fg"><label>Description *</label><textarea id="f-tmDsc" rows="2" placeholder="What happens each year?">'+h(p.description||'')+'</textarea></div>'+
+      fg('Default Assignee','f-tmAsgn',p.assignee,'text','')+
+      fg('Notes / Reminder','f-tmNts',p.notes,'text','Annual reminder context…');
+  }
+  else if(t==='addMember'||t==='editMember'){
+    title=t==='addMember'?'Add Board Member':'Edit Board Member'; saveFn='doSaveMember(\''+t+'\')';
+    body='<div class="frow">'+fg('Full Name *','f-mbNm',p.name,'text','')+fg('Role','f-mbRl',p.role,'text','President')+'</div>'+
+      '<div class="frow">'+fg('Email','f-mbEm',p.email,'email','')+fg('Phone','f-mbPh',p.phone,'tel','')+'</div>'+
+      fg('Term End Date','f-mbTe',p.termEnd,'date','')+
+      fg('Notes','f-mbNt',p.notes,'text','');
+  }
+  else if(t==='addVendor'||t==='editVendor'){
+    title=t==='addVendor'?'Add Vendor':'Edit Vendor'; saveFn='doSaveVendor(\''+t+'\')';
+    body='<div class="frow">'+fg('Company / Name *','f-vnNm',p.name,'text','')+fg('Category','f-vnCt',p.category,'text','Landscaping')+'</div>'+
+      '<div class="frow">'+fg('Phone','f-vnPh',p.phone,'tel','')+fg('Email','f-vnEm',p.email,'email','')+'</div>'+
+      fg('Notes (account #, access codes, etc.)','f-vnNt',p.notes,'text','');
+  }
+  else if(t==='addMinutes'||t==='editMinutes'){
+    title=t==='addMinutes'?'Add Meeting Minutes':'Edit Meeting Minutes'; saveFn='doSaveMinutes(\''+t+'\')';
+    body='<div class="frow">'+fg('Meeting Date','f-mnDt',p.date||today(),'date','')+fg('Title','f-mnTl',p.title,'text','Regular Board Meeting')+'</div>'+
+      fg('Attendees','f-mnAt',p.attendees,'text','Name, Name, Name…')+
+      '<div class="fg"><label>Minutes / Notes</label><textarea id="f-mnNt" rows="6" placeholder="Key decisions, action items, votes…">'+h(p.notes||'')+'</textarea></div>';
+  }
+  else if(t==='violNotice'){
+    title='📄 Violation Notice'; saveFn='doCopyNotice()'; saveLabel='Copy to Clipboard';
+    var prop=p.prop||{},viol=p.viol||{};
+    var s=App.data.settings;
+    var noticeText=[
+      (s.hoaName||'Homeowners Association').toUpperCase(),
+      s.hoaAddress||'',
+      s.hoaPhone||'',
+      '',
+      'VIOLATION NOTICE',
+      '',
+      'Date: '+new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}),
+      'Property Address: '+(prop.address||''),
+      'Owner: '+(prop.ownerName||''),
+      '',
+      'Dear '+(prop.ownerName||'Homeowner')+',',
+      '',
+      'This letter is to notify you that the property at '+(prop.address||'')+' has been found',
+      'to be in violation of the '+(s.hoaName||'HOA')+' Covenants, Conditions, and Restrictions.',
+      '',
+      'VIOLATION DETAILS',
+      'Date Observed: '+fdt(viol.date),
+      'Description: '+(viol.description||''),
+      '',
+      'You are requested to correct this violation within 30 days of this notice.',
+      'Failure to remedy the violation may result in additional fines or Board action.',
+      '',
+      'If you have questions or wish to dispute this notice, please contact the Board.',
+      '',
+      'Respectfully,',
+      '',
+      (s.hoaName||'HOA')+' Board of Directors',
+      (s.hoaPhone?s.hoaPhone+'\n':'')+
+      (s.hoaAddress||'')
+    ].join('\n');
+    body='<textarea class="notice-area" id="noticeText" readonly>'+h(noticeText)+'</textarea>';
+  }
+
+  var saveBtn=saveFn?'<button class="btn btn-p" id="modalSaveBtn" onclick="'+saveFn+'">'+saveLabel+'</button>':'';
+  return '<div class="overlay" onclick="overlayClick(event)">'+
+    '<div class="modal" id="theModal">'+
+    '<div class="modal-hd"><h3>'+title+'</h3>'+
+    '<button class="bico" onclick="closeModal()" style="font-size:16px">✕</button></div>'+
+    '<div class="modal-bd">'+body+'</div>'+
+    '<div class="modal-ft">'+
+    '<button class="btn btn-s" onclick="closeModal()">Cancel</button>'+saveBtn+
+    '</div></div></div>';
+}
+function fg(lbl,id,val,type,ph){
+  return '<div class="fg"><label>'+lbl+'</label><input id="'+id+'" type="'+(type||'text')+'" value="'+h(val||'')+'" placeholder="'+h(ph||'')+'"></div>';
+}
+function fgS(lbl,id,opts,sel){
+  return '<div class="fg"><label>'+lbl+'</label><select id="'+id+'">'+
+    opts.map(function(o){return '<option value="'+o[0]+'"'+(o[0]===sel?' selected':'')+'>'+o[1]+'</option>';}).join('')+
+    '</select></div>';
+}
+function overlayClick(e){if(e.target===e.currentTarget)closeModal();}
+
+// ─── ACTIONS ─────────────────────────────────────────────────────────────────
+function switchTab(t){App.tab=t;if(t==='tasks')App.tasksView='year';render();}
+function selectProp(id){App.selectedId=id;render();}
+function openModal(type,payload){App.modal={type:type,payload:payload};render();}
+function closeModal(){App.modal=null;render();}
+function toggleNR(){var el=document.getElementById('nrFields');if(el)el.style.display=gc('f-nr')?'block':'none';}
+
+// ─── SAVE HELPERS ─────────────────────────────────────────────────────────────
+// Immediately disable the Save button on first click — synchronous property
+// mutation, no DOM rebuild, safe to call before google.script.run.
+// Prevents double-submit while the RPC is in flight.
+function _disableSaveBtn(){
+  var btn=document.getElementById('modalSaveBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+}
+function _onSaveFail(e){
+  alert('Save error: '+(e.message||e));
+}
+
+// Settings
+function doSaveSettings(){
+  _disableSaveBtn();
+  var s={hoaName:gv('f-hoaNm'),duesAmount:gv('f-duesAmt'),duesDueDate:gv('f-duesDue'),
+    hoaAddress:gv('f-hoaAddr'),hoaPhone:gv('f-hoaPhone'),appUrl:gv('f-appUrl')};
+  google.script.run
+    .withSuccessHandler(function(){
+      Object.assign(App.data.settings, s);
+      App.modal=null; setTimeout(render,0);
+    })
+    .withFailureHandler(_onSaveFail)
+    .updateSettings(s);
+}
+
+// Property
+function doSaveProperty(){
+  _disableSaveBtn();
+  var addr=gv('f-addr'),own=gv('f-owNm');
+  if(!addr){alert('Address is required.');return;}
+  if(!own){alert('Owner name is required.');return;}
+  var pd={address:addr,lotNumber:gv('f-lot'),ownerName:own,ownerEmail:gv('f-owEm'),ownerPhone:gv('f-owPh'),
+    moveInDate:gv('f-mvIn'),duesStatus:gv('f-dues'),ownerOccupied:gc('f-nr')?'no':'yes',
+    contactName:gv('f-cNm'),contactPhone:gv('f-cPh'),contactEmail:gv('f-cEm'),contactAddress:gv('f-cAd'),
+    notes:gv('f-notes'),status:gv('f-status')};
+  var isEdit=App.modal.type==='editProperty';
+  if(isEdit){
+    pd.id=App.modal.payload.id;
+    google.script.run
+      .withSuccessHandler(function(){
+        var idx=App.data.properties.findIndex(function(x){return x.id===pd.id;});
+        if(idx>-1) Object.assign(App.data.properties[idx], pd);
+        App.modal=null; setTimeout(render,0);
+      })
+      .withFailureHandler(_onSaveFail)
+      .updateProperty(pd);
+  } else {
+    google.script.run
+      .withSuccessHandler(function(newId){
+        pd.id=newId; pd.payments=[]; pd.violations=[]; pd.docs=[];
+        App.data.properties.push(pd);
+        App.selectedId=newId;
+        App.modal=null; setTimeout(render,0);
+      })
+      .withFailureHandler(_onSaveFail)
+      .addProperty(pd);
+  }
+}
+function doDeleteProperty(id){
+  var p=App.data.properties.find(function(x){return x.id===id;});
+  if(!confirm('Remove "'+((p&&p.address)||id)+'" and ALL its records? This cannot be undone.'))return;
+  google.script.run
+    .withSuccessHandler(function(){
+      App.data.properties=App.data.properties.filter(function(x){return x.id!==id;});
+      App.selectedId=App.data.properties.length?App.data.properties[0].id:null;
+      setTimeout(render,0);
+    })
+    .withFailureHandler(_onSaveFail)
+    .deleteProperty(id);
+}
+function doBulkReset(){
+  if(!confirm('Reset ALL active properties to Unpaid? This should be done once at the start of a new dues year.'))return;
+  google.script.run
+    .withSuccessHandler(function(n){
+      App.data.properties.forEach(function(p){ if(p.status==='active') p.duesStatus='unpaid'; });
+      setTimeout(function(){ render(); alert(n+' properties reset to Unpaid.'); },0);
+    })
+    .withFailureHandler(_onSaveFail)
+    .bulkResetDues();
+}
+
+// Payment
+function doSavePayment(){
+  _disableSaveBtn();
+  var amt=gv('f-pmAm');if(!amt){alert('Amount is required.');return;}
+  var propId=App.modal.payload.id;
+  var pm={date:gv('f-pmDt'),period:gv('f-pmPd'),amount:amt,status:gv('f-pmSt'),note:gv('f-pmNt')};
+  google.script.run
+    .withSuccessHandler(function(newId){
+      pm.id=newId; pm.propertyId=propId;
+      var p=App.data.properties.find(function(x){return x.id===propId;});
+      if(p){ p.payments=p.payments||[]; p.payments.push(pm); }
+      App.modal=null; setTimeout(render,0);
+    })
+    .withFailureHandler(_onSaveFail)
+    .addPayment(propId,pm);
+}
+function doDeletePayment(id){
+  if(!confirm('Delete this payment?'))return;
+  google.script.run
+    .withSuccessHandler(function(){
+      App.data.properties.forEach(function(p){
+        p.payments=(p.payments||[]).filter(function(x){return x.id!==id;});
+      }); setTimeout(render,0);
+    })
+    .withFailureHandler(_onSaveFail)
+    .deletePayment(id);
+}
+
+// Violation
+function doSaveViolation(){
+  _disableSaveBtn();
+  var desc=gv('f-viDsc');if(!desc){alert('Description is required.');return;}
+  var propId=App.modal.payload.id;
+  var v={date:gv('f-viDt'),description:desc,status:gv('f-viSt')};
+  google.script.run
+    .withSuccessHandler(function(newId){
+      v.id=newId; v.propertyId=propId;
+      var p=App.data.properties.find(function(x){return x.id===propId;});
+      if(p){ p.violations=p.violations||[]; p.violations.push(v); }
+      App.modal=null; setTimeout(render,0);
+    })
+    .withFailureHandler(_onSaveFail)
+    .addViolation(propId,v);
+}
+function doDeleteViolation(id){
+  if(!confirm('Delete this violation/note?'))return;
+  google.script.run
+    .withSuccessHandler(function(){
+      App.data.properties.forEach(function(p){
+        p.violations=(p.violations||[]).filter(function(x){return x.id!==id;});
+      }); setTimeout(render,0);
+    })
+    .withFailureHandler(_onSaveFail)
+    .deleteViolation(id);
+}
+
+// Doc log
+function doSaveDoc(){
+  _disableSaveBtn();
+  var desc=gv('f-dcDsc');if(!desc){alert('Description is required.');return;}
+  var propId=App.modal.payload.propertyId;
+  var doc={date:gv('f-dcDt'),description:desc};
+  google.script.run
+    .withSuccessHandler(function(newId){
+      doc.id=newId; doc.propertyId=propId;
+      var p=App.data.properties.find(function(x){return x.id===propId;});
+      if(p){ p.docs=p.docs||[]; p.docs.push(doc); }
+      App.modal=null; setTimeout(render,0);
+    })
+    .withFailureHandler(_onSaveFail)
+    .addDoc(propId,doc);
+}
+function doDeleteDoc(id){
+  if(!confirm('Delete this log entry?'))return;
+  google.script.run
+    .withSuccessHandler(function(){
+      App.data.properties.forEach(function(p){
+        p.docs=(p.docs||[]).filter(function(x){return x.id!==id;});
+      }); setTimeout(render,0);
+    })
+    .withFailureHandler(_onSaveFail)
+    .deleteDoc(id);
+}
+
+// Tasks
+function doSaveTask(type){
+  _disableSaveBtn();
+  var desc=gv('f-tkDsc');if(!desc){alert('Description is required.');return;}
+  var td={year:gv('f-tkYr')||App.taskYear,month:gv('f-tkMo'),description:desc,
+    assignee:gv('f-tkAsgn'),dueDate:gv('f-tkDue'),status:gv('f-tkSt'),notes:gv('f-tkNts')};
+  if(type==='editTask'){
+    td.id=App.modal.payload.id;
+    google.script.run
+      .withSuccessHandler(function(){
+        var idx=App.data.tasks.findIndex(function(x){return x.id===td.id;});
+        if(idx>-1) App.data.tasks[idx]=td;
+        App.modal=null; setTimeout(render,0);
+      })
+      .withFailureHandler(_onSaveFail)
+      .updateTask(td);
+  } else {
+    google.script.run
+      .withSuccessHandler(function(newId){
+        td.id=newId; App.data.tasks.push(td);
+        App.modal=null; setTimeout(render,0);
+      })
+      .withFailureHandler(_onSaveFail)
+      .addTask(td);
+  }
+}
+function doToggleTask(id,wasDone){
+  var task=App.data.tasks.find(function(t){return t.id===id;});if(!task)return;
+  var newStatus=wasDone?'pending':'done';
+  google.script.run
+    .withSuccessHandler(function(){
+      task.status=newStatus; setTimeout(render,0);
+    })
+    .withFailureHandler(_onSaveFail)
+    .updateTask(Object.assign({},task,{status:newStatus}));
+}
+function doDeleteTask(id){
+  if(!confirm('Delete this task?'))return;
+  google.script.run
+    .withSuccessHandler(function(){
+      App.data.tasks=App.data.tasks.filter(function(x){return x.id!==id;});
+      setTimeout(render,0);
+    })
+    .withFailureHandler(_onSaveFail)
+    .deleteTask(id);
+}
+function doLoadYear(){
+  var yr=App.taskYear,n=App.data.templates.length;
+  if(!n){alert('No template tasks found. Click "✎ Template" to build your annual checklist first.');return;}
+  var ex=App.data.tasks.filter(function(t){return String(t.year)===String(yr);}).length;
+  if(!confirm('Load template tasks into '+yr+'?'+(ex?' Already-existing tasks will be skipped.':'')))return;
+  google.script.run
+    .withSuccessHandler(function(r){
+      var msg='Done! '+r.created+' task'+(r.created!==1?'s':'')+' added to '+yr+'.'+(r.skipped?' ('+r.skipped+' already existed, skipped)':'');
+      setTimeout(function(){ loadData(function(){ render(); alert(msg); }); }, 0);
+    })
+    .withFailureHandler(function(e){ var msg=e.message||e; setTimeout(function(){ alert('Error: '+msg); },0); })
+    .loadTasksForYear(yr);
+}
+
+// Templates
+function doSaveTemplate(type){
+  _disableSaveBtn();
+  var desc=gv('f-tmDsc');if(!desc){alert('Description is required.');return;}
+  var td={month:gv('f-tmMo'),description:desc,assignee:gv('f-tmAsgn'),notes:gv('f-tmNts')};
+  if(type==='editTemplate'){
+    td.id=App.modal.payload.id;
+    google.script.run
+      .withSuccessHandler(function(){
+        var idx=App.data.templates.findIndex(function(x){return x.id===td.id;});
+        if(idx>-1) App.data.templates[idx]=td;
+        App.modal=null; setTimeout(render,0);
+      })
+      .withFailureHandler(_onSaveFail)
+      .updateTemplate(td);
+  } else {
+    google.script.run
+      .withSuccessHandler(function(newId){
+        td.id=newId; App.data.templates.push(td);
+        App.modal=null; setTimeout(render,0);
+      })
+      .withFailureHandler(_onSaveFail)
+      .addTemplate(td);
+  }
+}
+function doDeleteTemplate(id){
+  if(!confirm('Remove this task from the annual template?'))return;
+  google.script.run
+    .withSuccessHandler(function(){
+      App.data.templates=App.data.templates.filter(function(x){return x.id!==id;});
+      setTimeout(render,0);
+    })
+    .withFailureHandler(_onSaveFail)
+    .deleteTemplate(id);
+}
+
+// Board Members
+function doSaveMember(type){
+  _disableSaveBtn();
+  var nm=gv('f-mbNm');if(!nm){alert('Name is required.');return;}
+  var m={name:nm,role:gv('f-mbRl'),email:gv('f-mbEm'),phone:gv('f-mbPh'),termEnd:gv('f-mbTe'),notes:gv('f-mbNt')};
+  if(type==='editMember'){
+    m.id=App.modal.payload.id;
+    google.script.run
+      .withSuccessHandler(function(){
+        var idx=App.data.members.findIndex(function(x){return x.id===m.id;});
+        if(idx>-1) App.data.members[idx]=m;
+        App.modal=null; setTimeout(render,0);
+      })
+      .withFailureHandler(_onSaveFail)
+      .updateMember(m);
+  } else {
+    google.script.run
+      .withSuccessHandler(function(newId){
+        m.id=newId; App.data.members.push(m);
+        App.modal=null; setTimeout(render,0);
+      })
+      .withFailureHandler(_onSaveFail)
+      .addMember(m);
+  }
+}
+function doDeleteMember(id){
+  if(!confirm('Remove this board member?'))return;
+  google.script.run
+    .withSuccessHandler(function(){
+      App.data.members=App.data.members.filter(function(x){return x.id!==id;});
+      setTimeout(render,0);
+    })
+    .withFailureHandler(_onSaveFail)
+    .deleteMember(id);
+}
+
+// Vendors
+function doSaveVendor(type){
+  _disableSaveBtn();
+  var nm=gv('f-vnNm');if(!nm){alert('Name is required.');return;}
+  var v={name:nm,category:gv('f-vnCt'),phone:gv('f-vnPh'),email:gv('f-vnEm'),notes:gv('f-vnNt')};
+  if(type==='editVendor'){
+    v.id=App.modal.payload.id;
+    google.script.run
+      .withSuccessHandler(function(){
+        var idx=App.data.vendors.findIndex(function(x){return x.id===v.id;});
+        if(idx>-1) App.data.vendors[idx]=v;
+        App.modal=null; setTimeout(render,0);
+      })
+      .withFailureHandler(_onSaveFail)
+      .updateVendor(v);
+  } else {
+    google.script.run
+      .withSuccessHandler(function(newId){
+        v.id=newId; App.data.vendors.push(v);
+        App.modal=null; setTimeout(render,0);
+      })
+      .withFailureHandler(_onSaveFail)
+      .addVendor(v);
+  }
+}
+function doDeleteVendor(id){
+  if(!confirm('Remove this vendor?'))return;
+  google.script.run
+    .withSuccessHandler(function(){
+      App.data.vendors=App.data.vendors.filter(function(x){return x.id!==id;});
+      setTimeout(render,0);
+    })
+    .withFailureHandler(_onSaveFail)
+    .deleteVendor(id);
+}
+
+// Minutes
+function doSaveMinutes(type){
+  _disableSaveBtn();
+  var mn={date:gv('f-mnDt'),title:gv('f-mnTl'),attendees:gv('f-mnAt'),notes:gv('f-mnNt')};
+  if(type==='editMinutes'){
+    mn.id=App.modal.payload.id;
+    google.script.run
+      .withSuccessHandler(function(){
+        var idx=App.data.minutes.findIndex(function(x){return x.id===mn.id;});
+        if(idx>-1) App.data.minutes[idx]=mn;
+        App.modal=null; setTimeout(render,0);
+      })
+      .withFailureHandler(_onSaveFail)
+      .updateMinutes(mn);
+  } else {
+    google.script.run
+      .withSuccessHandler(function(newId){
+        mn.id=newId; App.data.minutes.push(mn);
+        App.modal=null; setTimeout(render,0);
+      })
+      .withFailureHandler(_onSaveFail)
+      .addMinutes(mn);
+  }
+}
+function doDeleteMinutes(id){
+  if(!confirm('Delete these meeting minutes?'))return;
+  google.script.run
+    .withSuccessHandler(function(){
+      App.data.minutes=App.data.minutes.filter(function(x){return x.id!==id;});
+      setTimeout(render,0);
+    })
+    .withFailureHandler(_onSaveFail)
+    .deleteMinutes(id);
+}
+
+// Settings
+// Violation notice
+function doCopyNotice(){
+  var el=document.getElementById('noticeText');
+  if(!el)return;
+  el.select();
+  navigator.clipboard.writeText(el.value).then(function(){
+    alert('Notice copied to clipboard!');
+  }).catch(function(){
+    document.execCommand('copy');
+    alert('Notice copied to clipboard!');
+  });
+}
+
+// Email copy — safe ID-based lookup avoids HTML entity issues in onclick
+function doCopyById(key){
+  var obj=_map[key];
+  if(obj&&obj.text) doCopyText(obj.text);
+}
+function doCopyText(txt){
+  navigator.clipboard.writeText(txt).then(function(){
+    alert('Copied to clipboard!');
+  }).catch(function(){
+    var ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);
+    ta.select();document.execCommand('copy');document.body.removeChild(ta);
+    alert('Copied to clipboard!');
+  });
+}
+
+// Export
+function doExportJSON(){
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(App.data,null,2)],{type:'application/json'}));
+  a.download='hoa-data.json';a.click();
+}
+function doExportCSV(){
+  var rows=[['Address','Lot#','Owner','Email','Phone','Move-in','Dues','Status','Contact Name','Contact Phone','Notes','Open Violations','Total Paid This Year']];
+  var yr=new Date().getFullYear();
+  App.data.properties.forEach(function(p){
+    var ov=(p.violations||[]).filter(function(v){return v.status==='open';}).length;
+    var tot=(p.payments||[]).filter(function(pm){return String((pm.date||'').substring(0,4))===String(yr);})
+      .reduce(function(s,pm){return s+parseFloat(pm.amount||0);},0);
+    rows.push([p.address,p.lotNumber||'',p.ownerName,p.ownerEmail||'',p.ownerPhone||'',p.moveInDate||'',
+      p.duesStatus,p.status||'active',p.contactName||'',p.contactPhone||'',p.notes||'',ov,tot.toFixed(2)]);
+  });
+  var csv=rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='hoa-properties.csv';a.click();
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded',function(){
+  loadData(function(d){
+    if(d.properties.length)App.selectedId=d.properties[0].id;
+    setTimeout(render,0);
+  });
+});
+</script>
+</body>
+</html>
+
+<script>
+(function(){
+  var DELAY=500;
+  var _db={
+    settings:{hoaName:'Maplewood Estates HOA',duesAmount:'300',duesDueDate:'March 1',
+      hoaAddress:'1 Maplewood Drive, Anytown ST 00000',hoaPhone:'(555) 000-0100',appUrl:''},
+    properties:[
+      {id:'p1',address:'100 Maplewood Drive',lotNumber:'1',ownerName:'Alice Johnson',ownerEmail:'alice@example.com',
+       ownerPhone:'(555) 000-0101',moveInDate:'2018-05-01',duesStatus:'paid',ownerOccupied:'yes',
+       contactName:'',contactPhone:'',contactEmail:'',contactAddress:'',notes:'',status:'active',
+       payments:[{id:'pm1',propertyId:'p1',date:'2026-02-15',period:'2026',amount:'300',status:'paid',note:'Check #1001'}],
+       violations:[],docs:[]},
+      {id:'p2',address:'102 Maplewood Drive',lotNumber:'2',ownerName:"Bob O'Brien",ownerEmail:'bob@example.com',
+       ownerPhone:'(555) 000-0202',moveInDate:'2020-11-15',duesStatus:'unpaid',ownerOccupied:'no',
+       contactName:"Robert O'Brien",contactPhone:'(555) 000-9999',contactEmail:'robert@example.com',
+       contactAddress:'500 Other Street, Othertown ST 00001',notes:'Rental property',status:'active',
+       payments:[],
+       violations:[{id:'v1',propertyId:'p2',date:'2026-01-10',description:'Unsecured trash bins left on curb for 4+ days',status:'open'}],
+       docs:[{id:'d1',propertyId:'p2',date:'2026-01-12',description:'Violation notice mailed certified mail, tracking #94001118992234'}]},
+      {id:'p3',address:'104 Maplewood Drive',lotNumber:'3',ownerName:'Carol Martinez',ownerEmail:'carol@example.com',
+       ownerPhone:'(555) 000-0303',moveInDate:'2022-03-20',duesStatus:'partial',ownerOccupied:'yes',
+       contactName:'',contactPhone:'',contactEmail:'',contactAddress:'',notes:'',status:'active',
+       payments:[{id:'pm2',propertyId:'p3',date:'2026-01-30',period:'2026',amount:'150',status:'partial',note:'Balance promised by April'}],
+       violations:[],docs:[]},
+      {id:'p4',address:'106 Maplewood Drive',lotNumber:'4',ownerName:'Previous Owner',ownerEmail:'',
+       ownerPhone:'',moveInDate:'2015-01-01',duesStatus:'paid',ownerOccupied:'yes',
+       contactName:'',contactPhone:'',contactEmail:'',contactAddress:'',notes:'Sold 2025',status:'sold',
+       payments:[],violations:[],docs:[]}
+    ],
+    tasks:[
+      {id:'t1',year:'2026',month:'1',description:'Send annual dues notices to all homeowners',assignee:'Treasurer',dueDate:'2026-01-15',status:'done',notes:''},
+      {id:'t2',year:'2026',month:'3',description:'Begin dues collection — contact delinquent owners',assignee:'President',dueDate:'2026-03-15',status:'pending',notes:'Check unpaid after 60 days'},
+      {id:'t3',year:'2026',month:'4',description:'Spring common area inspection',assignee:'',dueDate:'2026-04-15',status:'pending',notes:'Document any violations found'}
+    ],
+    templates:[
+      {id:'tmpl1',month:'1',description:'Send annual dues notices to all homeowners',assignee:'Treasurer',notes:'Send by mail and email'},
+      {id:'tmpl2',month:'2',description:'Follow up on unpaid dues',assignee:'Treasurer',notes:''},
+      {id:'tmpl3',month:'3',description:'Begin dues collection — contact delinquent owners',assignee:'President',notes:'Check unpaid after 60 days'},
+      {id:'tmpl4',month:'4',description:'Spring common area inspection',assignee:'',notes:'Document any violations found'},
+      {id:'tmpl5',month:'9',description:'Annual homeowners meeting',assignee:'President',notes:''},
+      {id:'tmpl6',month:'10',description:'Budget planning for next year',assignee:'Treasurer',notes:''},
+      {id:'tmpl7',month:'12',description:'Year-end financial summary',assignee:'Treasurer',notes:'Prepare for records'}
+    ],
+    members:[
+      {id:'mb1',name:'Alice Johnson',role:'President',email:'alice@example.com',phone:'(555) 000-0101',termEnd:'2026-12-31',notes:''},
+      {id:'mb2',name:'David Lee',role:'Treasurer',email:'david@example.com',phone:'(555) 000-0404',termEnd:'2027-06-30',notes:''}
+    ],
+    vendors:[
+      {id:'vn1',name:'Green Thumb Landscaping',category:'Landscaping',phone:'(555) 000-2001',email:'greenthumb@example.com',notes:'Call 48hrs before service'},
+      {id:'vn2',name:'SecureGate Systems',category:'Gate & Entry',phone:'(555) 000-2002',email:'',notes:'Gate code: 0000, emergency ext 3'}
+    ],
+    minutes:[
+      {id:'mn1',date:'2026-01-15',title:'January Board Meeting',attendees:'Alice Johnson, David Lee',notes:'1. Approved 2026 budget unanimously.\n2. Voted to send dues notices by Jan 20.\nNext meeting: February 19'}
+    ]
+  };
+  function makeRunner(){
+    var _s,_f;
+    var r={withSuccessHandler:function(fn){_s=fn;return r;},withFailureHandler:function(fn){_f=fn;return r;}};
+    function ok(v){setTimeout(function(){try{if(_s)_s(v);}catch(e){if(_f)_f(e);}},DELAY);}
+    r.getAllData=function(){ok(JSON.parse(JSON.stringify(_db)));};
+    r.updateSettings=function(s){Object.assign(_db.settings,s);ok(true);};
+    r.addProperty=function(p){p.id='p'+Date.now();p.payments=[];p.violations=[];p.docs=[];_db.properties.push(p);ok(p.id);};
+    r.updateProperty=function(p){var i=_db.properties.findIndex(function(x){return x.id===p.id;});if(i>-1)Object.assign(_db.properties[i],p);ok(true);};
+    r.deleteProperty=function(id){_db.properties=_db.properties.filter(function(x){return x.id!==id;});ok(true);};
+    r.bulkResetDues=function(){var n=0;_db.properties.forEach(function(p){if(p.status==='active'){p.duesStatus='unpaid';n++;}});ok(n);};
+    r.addPayment=function(pid,pm){pm.id='pm'+Date.now();pm.propertyId=pid;var p=_db.properties.find(function(x){return x.id===pid;});if(p){p.payments=p.payments||[];p.payments.push(pm);}ok(pm.id);};
+    r.deletePayment=function(id){_db.properties.forEach(function(p){p.payments=(p.payments||[]).filter(function(x){return x.id!==id;});});ok(true);};
+    r.addViolation=function(pid,v){v.id='v'+Date.now();v.propertyId=pid;var p=_db.properties.find(function(x){return x.id===pid;});if(p){p.violations=p.violations||[];p.violations.push(v);}ok(v.id);};
+    r.deleteViolation=function(id){_db.properties.forEach(function(p){p.violations=(p.violations||[]).filter(function(x){return x.id!==id;});});ok(true);};
+    r.addDoc=function(pid,d){d.id='d'+Date.now();d.propertyId=pid;var p=_db.properties.find(function(x){return x.id===pid;});if(p){p.docs=p.docs||[];p.docs.push(d);}ok(d.id);};
+    r.deleteDoc=function(id){_db.properties.forEach(function(p){p.docs=(p.docs||[]).filter(function(x){return x.id!==id;});});ok(true);};
+    r.addTask=function(t){t.id='tk'+Date.now();_db.tasks.push(t);ok(t.id);};
+    r.updateTask=function(t){var i=_db.tasks.findIndex(function(x){return x.id===t.id;});if(i>-1)_db.tasks[i]=t;ok(true);};
+    r.deleteTask=function(id){_db.tasks=_db.tasks.filter(function(x){return x.id!==id;});ok(true);};
+    r.loadTasksForYear=function(yr){
+      var ex=_db.tasks.filter(function(t){return String(t.year)===String(yr);}).map(function(t){return t.description.trim().toLowerCase();});
+      var c=0,s=0;
+      _db.templates.forEach(function(tm){
+        if(ex.includes(tm.description.trim().toLowerCase())){s++;return;}
+        _db.tasks.push({id:'tk'+Date.now()+'_'+Math.random(),year:yr,month:tm.month,description:tm.description,assignee:tm.assignee||'',dueDate:'',status:'pending',notes:tm.notes||''});
+        c++;
+      });
+      ok({created:c,skipped:s});
+    };
+    r.addTemplate=function(t){t.id='tmpl'+Date.now();_db.templates.push(t);ok(t.id);};
+    r.updateTemplate=function(t){var i=_db.templates.findIndex(function(x){return x.id===t.id;});if(i>-1)_db.templates[i]=t;ok(true);};
+    r.deleteTemplate=function(id){_db.templates=_db.templates.filter(function(x){return x.id!==id;});ok(true);};
+    r.addMember=function(m){m.id='mb'+Date.now();_db.members.push(m);ok(m.id);};
+    r.updateMember=function(m){var i=_db.members.findIndex(function(x){return x.id===m.id;});if(i>-1)_db.members[i]=m;ok(true);};
+    r.deleteMember=function(id){_db.members=_db.members.filter(function(x){return x.id!==id;});ok(true);};
+    r.addVendor=function(v){v.id='vn'+Date.now();_db.vendors.push(v);ok(v.id);};
+    r.updateVendor=function(v){var i=_db.vendors.findIndex(function(x){return x.id===v.id;});if(i>-1)_db.vendors[i]=v;ok(true);};
+    r.deleteVendor=function(id){_db.vendors=_db.vendors.filter(function(x){return x.id!==id;});ok(true);};
+    r.addMinutes=function(m){m.id='mn'+Date.now();_db.minutes.push(m);ok(m.id);};
+    r.updateMinutes=function(m){var i=_db.minutes.findIndex(function(x){return x.id===m.id;});if(i>-1)_db.minutes[i]=m;ok(true);};
+    r.deleteMinutes=function(id){_db.minutes=_db.minutes.filter(function(x){return x.id!==id;});ok(true);};
+    return r;
+  }
+  window.google={script:{run:new Proxy({},{get:function(){return makeRunner();}})}};
+  console.log('[HARNESS] Mock ready — '+DELAY+'ms simulated latency');
+})();
+</script>
