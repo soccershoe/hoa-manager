@@ -287,7 +287,8 @@ function fmt$(n){return '$'+(parseFloat(n)||0).toFixed(2);}
 // ─── LOOKUP MAP ───────────────────────────────────────────────────────────────
 var _map={};
 function _reg(obj){if(obj&&obj.id)_map[obj.id]=obj;return obj;}
-function openModalById(type,id){App.modal={type:type,payload:_map[id]||{}};render();}
+function _resetSaving(){}   // reserved for future save-state UI; no-op keeps call sites stable
+function openModalById(type,id){_resetSaving();App.modal={type:type,payload:_map[id]||{}};render();}
 
 // ─── DATA ─────────────────────────────────────────────────────────────────────
 // silent=true: don't show spinner (safe to call from inside google.script.run callbacks)
@@ -296,6 +297,7 @@ function loadData(cb, silent){
   if(!silent){ App.loading=true; render(); }
   google.script.run
     .withSuccessHandler(function(d){
+      _resetSaving();
       App.data=d; App.loading=false;
       setTimeout(function(){ if(cb)cb(d); else render(); }, 0);
     })
@@ -404,7 +406,7 @@ function renderPropsTab(){
     if(!App.showInactive&&p.status!=='active')return false;
     if(!App.propSearch)return true;
     var q=App.propSearch.toLowerCase();
-    return (p.address+' '+(p.ownerName||'')+' '+(p.lotNumber||'')).toLowerCase().indexOf(q)>-1;
+    return (p.address+' '+(p.residentName||'')+' '+(p.ownerName||'')+' '+(p.lotNumber||'')).toLowerCase().indexOf(q)>-1;
   });
 
   // Auto-select
@@ -414,7 +416,7 @@ function renderPropsTab(){
   var sp=filtered.find(function(p){return p.id===App.selectedId;})||null;
 
   var list='<div>'+
-    '<input class="search-inp" id="propSearch" type="text" placeholder="🔍 Search address, owner, lot…" value="'+h(App.propSearch)+'" oninput="App.propSearch=this.value;render()">'+
+    '<input class="search-inp" id="propSearch" type="text" placeholder="🔍 Search address, resident, owner, lot…" value="'+h(App.propSearch)+'" oninput="App.propSearch=this.value;render()">'+
     '<label class="filter-row"><input type="checkbox"'+(App.showInactive?' checked':'')+' onchange="App.showInactive=this.checked;render()"> Show inactive / sold</label>'+
     '<div class="list-lbl">'+filtered.length+' propert'+(filtered.length===1?'y':'ies')+'</div>'+
     '<div class="prop-list">';
@@ -422,12 +424,13 @@ function renderPropsTab(){
     var ov=(p.violations||[]).filter(function(v){return v.status==='open';}).length;
     var bal=calcBal(p);
     var balStr=bal&&bal.assessed?' · '+fmt$(bal.paid)+'/'+fmt$(bal.assessed):'';
+    var hasOwner=p.hasOwner==='yes';
     list+='<div class="pc'+(p.id===App.selectedId?' on':'')+(p.status!=='active'?' dim':'')+'" onclick="selectProp(\''+h(p.id)+'\')">'+
       '<div class="pc-addr">'+h(p.address)+(p.lotNumber?' <span style="font-weight:400;color:var(--mu)">Lot '+h(p.lotNumber)+'</span>':'')+'</div>'+
-      '<div class="pc-owner">'+h(p.ownerName)+balStr+'</div>'+
+      '<div class="pc-owner">'+h(p.residentName||'—')+balStr+'</div>'+
       '<div class="pc-bdg">'+duesBadge(p.duesStatus)+
       (ov?'<span class="bdg b-vl">⚠ '+ov+'</span>':'')+
-      (p.ownerOccupied==='no'?'<span class="bdg b-nr">Non-res</span>':'')+
+      (hasOwner?'<span class="bdg b-nr">Owner differs</span>':'')+
       stBadge(p.status)+
       '</div></div>';
   });
@@ -443,14 +446,14 @@ function sc(label,val,cls){return '<div class="stat"><div class="s-lbl">'+label+
 function renderDetail(p){
   var pmts=p.payments||[],viols=p.violations||[],docs=p.docs||[];
   var ov=viols.filter(function(v){return v.status==='open';}).length;
-  var nr=p.ownerOccupied==='no';
+  var hasOwner=p.hasOwner==='yes';
   var bal=calcBal(p);
 
   var html='<div class="dp">'+
     '<div class="dp-hdr"><div>'+
     '<div class="dp-addr">'+h(p.address)+(p.lotNumber?' <span style="font-size:13px;font-weight:400;color:var(--mu)">· Lot '+h(p.lotNumber)+'</span>':'')+'</div>'+
-    '<div class="dp-sub">'+h(p.ownerName)+
-    (nr?' <span class="bdg b-nr">Non-resident owner</span>':'')+
+    '<div class="dp-sub">'+h(p.residentName||'—')+
+    (hasOwner?' <span class="bdg b-nr">Owner differs</span>':'')+
     stBadge(p.status)+
     '</div></div>'+
     '<div class="dp-acts">'+
@@ -460,9 +463,9 @@ function renderDetail(p){
 
   // Balance strip
   if(bal){
-    var balColor = bal.balance > 0 ? 'vr' : 'vg';
-    var balLabel = bal.balance < 0 ? 'Overpaid' : (bal.balance === 0 ? 'Paid in Full' : 'Balance Due');
-    var balDisplay = bal.balance < 0 ? '('+fmt$(-bal.balance)+')' : fmt$(bal.balance);
+    var balColor=bal.balance>0?'vr':'vg';
+    var balLabel=bal.balance<0?'Overpaid':(bal.balance===0?'Paid in Full':'Balance Due');
+    var balDisplay=bal.balance<0?'('+fmt$(-bal.balance)+')':fmt$(bal.balance);
     html+='<div class="bal-strip">'+
       '<div class="bal-cell"><div class="bal-lbl">Annual Dues</div><div class="bal-val">'+fmt$(bal.assessed)+'</div></div>'+
       '<div class="bal-cell"><div class="bal-lbl">Paid ('+new Date().getFullYear()+')</div><div class="bal-val vg">'+fmt$(bal.paid)+'</div></div>'+
@@ -472,22 +475,27 @@ function renderDetail(p){
 
   html+='<div class="dp-body">';
 
-  // Owner info
-  html+='<div class="dp-sec"><div class="dp-shd"><span>Owner & Property</span></div>'+
+  // Resident section
+  html+='<div class="dp-sec"><div class="dp-shd"><span>🏠 Resident</span></div>'+
     '<div class="igrid">'+
-    ii('Owner',p.ownerName)+ii('Email',p.ownerEmail)+
-    ii('Phone',p.ownerPhone)+ii('Move-in',fdt(p.moveInDate))+
-    ii('Dues Status',duesBadge(p.duesStatus))+ii('Owner Occupied',nr?'No — non-resident':'Yes')+
-    (p.notes?'<div style="grid-column:1/-1">'+ik('Notes')+iv(p.notes)+'</div>':'')+
+    ii('Name',p.residentName)+ii('Email',p.residentEmail)+
+    ii('Phone',p.residentPhone)+ii('Move-in',fdt(p.moveInDate))+
+    ii('Dues Status',duesBadge(p.duesStatus))+ii('Property Status',p.status||'active')+
+    '</div>'+
+    (p.residentNotes?'<div style="margin-top:10px">'+ik('Resident Notes')+'<div class="iv" style="white-space:pre-wrap;margin-top:2px">'+h(p.residentNotes)+'</div></div>':'')+
     '</div>';
-  if(nr&&(p.contactName||p.contactPhone||p.contactEmail||p.contactAddress)){
-    html+='<div class="cbox"><div class="cbox-lbl">📞 Non-Resident Contact</div>'+
-      '<div class="igrid" style="grid-template-columns:1fr 1fr 1fr">'+
-      ii('Name',p.contactName)+ii('Phone',p.contactPhone)+ii('Email',p.contactEmail)+
-      (p.contactAddress?'<div style="grid-column:1/-1">'+ik('Mailing Address')+iv(p.contactAddress)+'</div>':'')+
-      '</div></div>';
+
+  // Owner section (only when different from resident)
+  if(hasOwner){
+    html+='<div class="dp-sec"><div class="dp-shd"><span>🏢 Owner</span></div>'+
+      '<div class="igrid">'+
+      ii('Owner Name',p.ownerName)+ii('Business',p.ownerBusiness)+
+      ii('Email',p.ownerEmail)+ii('Phone',p.ownerPhone)+
+      (p.ownerAddress?'<div style="grid-column:1/-1">'+ik('Mailing Address')+iv(p.ownerAddress)+'</div>':'')+
+      '</div>'+
+      (p.ownerNotes?'<div style="margin-top:10px">'+ik('Owner Notes')+'<div class="iv" style="white-space:pre-wrap;margin-top:2px">'+h(p.ownerNotes)+'</div></div>':'')+
+      '</div>';
   }
-  html+='</div>';
 
   // Payments
   html+='<div class="dp-sec"><div class="dp-shd"><span>Payments</span>'+
@@ -686,13 +694,13 @@ function renderReportsTab(){
   var html='';
 
   // Email merge
-  var allEmails=active.filter(function(p){return p.ownerEmail;}).map(function(p){return p.ownerEmail;});
-  var unpaidEmails=unpaid.filter(function(p){return p.ownerEmail;}).map(function(p){return p.ownerEmail;});
-  var nrEmails=active.filter(function(p){return p.ownerOccupied==='no'&&p.contactEmail;}).map(function(p){return p.contactEmail;});
+  var allEmails=active.filter(function(p){return p.residentEmail;}).map(function(p){return p.residentEmail;});
+  var unpaidEmails=unpaid.filter(function(p){return p.residentEmail;}).map(function(p){return p.residentEmail;});
+  var ownerEmails=active.filter(function(p){return p.hasOwner==='yes'&&p.ownerEmail;}).map(function(p){return p.ownerEmail;});
   html+='<div class="rpt-sec"><div class="rpt-hd"><h3>📧 Email Lists</h3><span style="font-size:12px;color:var(--mu)">Click Copy to get a BCC-ready list</span></div><div class="rpt-body">'+
-    emailRow('All Active Owners',allEmails)+
+    emailRow('All Resident Emails',allEmails)+
     emailRow('Unpaid / Partial Only',unpaidEmails)+
-    emailRow('Non-Resident Contacts',nrEmails)+
+    emailRow('Owner Emails (where different)',ownerEmails)+
     '</div></div>';
 
   // Bulk actions
@@ -722,7 +730,7 @@ function renderReportsTab(){
     html+='<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mu);margin-bottom:8px">Unpaid Properties</div>';
     unpaid.forEach(function(p){
       html+='<div style="padding:6px 0;border-bottom:1px solid var(--bdr);font-size:13px;display:flex;justify-content:space-between">'+
-        '<span>'+h(p.address)+' — '+h(p.ownerName)+'</span>'+
+        '<span>'+h(p.address)+' — '+h(p.residentName||p.ownerName||'—')+'</span>'+
         '<span>'+duesBadge(p.duesStatus)+'</span></div>';
     });
   }
@@ -775,20 +783,25 @@ function renderModal(){
   }
   else if(t==='addProperty'||t==='editProperty'){
     title=t==='addProperty'?'Add Property':'Edit Property'; saveFn='doSaveProperty()';
-    var nr=p.ownerOccupied==='no';
-    body='<div class="frow">'+fg('Street Address *','f-addr',p.address,'text','123 Maple St')+fg('Lot #','f-lot',p.lotNumber,'text','42')+'</div>'+
-      '<div class="sdiv">Owner Information</div>'+
-      '<div class="frow">'+fg('Owner Name *','f-owNm',p.ownerName,'text','Jane Doe')+fg('Move-in Date','f-mvIn',p.moveInDate,'date','')+'</div>'+
-      '<div class="frow">'+fg('Owner Email','f-owEm',p.ownerEmail,'email','')+fg('Owner Phone','f-owPh',p.ownerPhone,'tel','')+'</div>'+
+    var hasOwner=p.hasOwner==='yes';
+    body=
+      '<div class="frow">'+fg('Street Address *','f-addr',p.address,'text','123 Maple St')+fg('Lot #','f-lot',p.lotNumber,'text','42')+'</div>'+
+      '<div class="sdiv">🏠 Resident Information</div>'+
+      '<div class="frow">'+fg('Resident Name *','f-resNm',p.residentName,'text','Jane Doe')+fg('Move-in Date','f-mvIn',p.moveInDate,'date','')+'</div>'+
+      '<div class="frow">'+fg('Resident Email','f-resEm',p.residentEmail,'email','jane@email.com')+fg('Resident Phone','f-resPh',p.residentPhone,'tel','(555) 000-0000')+'</div>'+
+      '<div class="fg"><label>Resident Notes</label><textarea id="f-resNt" rows="2" style="resize:vertical" placeholder="Any notes about the resident…">'+h(p.residentNotes||'')+'</textarea></div>'+
+      '<div class="sdiv">💰 Dues & Status</div>'+
       '<div class="frow">'+fgS('Dues Status','f-dues',[['paid','Paid'],['unpaid','Unpaid'],['partial','Partial']],p.duesStatus||'unpaid')+
       fgS('Property Status','f-status',[['active','Active'],['inactive','Inactive'],['sold','Sold / Transferred']],p.status||'active')+'</div>'+
-      '<div class="tgl"><input type="checkbox" id="f-nr"'+(nr?' checked':'')+' onchange="toggleNR()">'+
-      '<label for="f-nr">Owner does <strong>not</strong> live at this property</label></div>'+
-      '<div id="nrFields" style="display:'+(nr?'block':'none')+'">'+
-      '<div class="sdiv">Non-Resident Contact</div>'+
-      '<div class="frow">'+fg('Contact Name','f-cNm',p.contactName,'text','')+fg('Contact Phone','f-cPh',p.contactPhone,'tel','')+'</div>'+
-      '<div class="frow">'+fg('Contact Email','f-cEm',p.contactEmail,'email','')+fg('Contact Address','f-cAd',p.contactAddress,'text','')+'</div>'+
-      '</div>'+fg('Notes','f-notes',p.notes,'text','');
+      '<div class="tgl"><input type="checkbox" id="f-hasOwner"'+(hasOwner?' checked':'')+' onchange="toggleOwnerFields()">'+
+      '<label for="f-hasOwner">Owner is <strong>different</strong> from the resident (rental, trust, business, etc.)</label></div>'+
+      '<div id="ownerFields" style="display:'+(hasOwner?'block':'none')+'">'+
+      '<div class="sdiv">🏢 Owner Information</div>'+
+      '<div class="frow">'+fg('Owner Name','f-owNm',p.ownerName,'text','John Smith')+fg('Business Name','f-owBiz',p.ownerBusiness,'text','Smith Properties LLC')+'</div>'+
+      '<div class="frow">'+fg('Owner Email','f-owEm',p.ownerEmail,'email','john@email.com')+fg('Owner Phone','f-owPh',p.ownerPhone,'tel','(555) 000-0000')+'</div>'+
+      fg('Owner Mailing Address','f-owAddr',p.ownerAddress,'text','456 Other St, City, ST 00000')+
+      '<div class="fg"><label>Owner Notes</label><textarea id="f-owNt" rows="2" style="resize:vertical" placeholder="Any notes about the owner…">'+h(p.ownerNotes||'')+'</textarea></div>'+
+      '</div>';
   }
   else if(t==='addPayment'){
     title='Add Payment — '+h(p.address||''); saveFn='doSavePayment()';
@@ -848,6 +861,7 @@ function renderModal(){
     title='📄 Violation Notice'; saveFn='doCopyNotice()'; saveLabel='Copy to Clipboard';
     var prop=p.prop||{},viol=p.viol||{};
     var s=App.data.settings;
+    var recipientName=prop.residentName||prop.ownerName||'Homeowner';
     var noticeText=[
       (s.hoaName||'Homeowners Association').toUpperCase(),
       s.hoaAddress||'',
@@ -857,9 +871,10 @@ function renderModal(){
       '',
       'Date: '+new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}),
       'Property Address: '+(prop.address||''),
-      'Owner: '+(prop.ownerName||''),
+      'Resident: '+(prop.residentName||'—'),
+      (prop.hasOwner==='yes'?'Owner: '+[(prop.ownerBusiness||''),(prop.ownerName||'')].filter(Boolean).join(' / '):''),
       '',
-      'Dear '+(prop.ownerName||'Homeowner')+',',
+      'Dear '+(recipientName)+',',
       '',
       'This letter is to notify you that the property at '+(prop.address||'')+' has been found',
       'to be in violation of the '+(s.hoaName||'HOA')+' Covenants, Conditions, and Restrictions.',
@@ -876,18 +891,18 @@ function renderModal(){
       'Respectfully,',
       '',
       (s.hoaName||'HOA')+' Board of Directors',
-      (s.hoaPhone?s.hoaPhone+'\n':'')+
-      (s.hoaAddress||'')
-    ].join('\n');
+      (s.hoaPhone?s.hoaPhone+'\n':'')+(s.hoaAddress||'')
+    ].filter(function(l){return l!==false;}).join('\n');
     body='<textarea class="notice-area" id="noticeText" readonly>'+h(noticeText)+'</textarea>';
   }
 
-  var saveBtn=saveFn?'<button class="btn btn-p" id="modalSaveBtn" onclick="'+saveFn+'">'+saveLabel+'</button>':'';
+  var saveBtn=saveFn?'<button class="btn btn-p" onclick="'+saveFn+'">'+saveLabel+'</button>':'';
   return '<div class="overlay" onclick="overlayClick(event)">'+
     '<div class="modal" id="theModal">'+
     '<div class="modal-hd"><h3>'+title+'</h3>'+
     '<button class="bico" onclick="closeModal()" style="font-size:16px">✕</button></div>'+
     '<div class="modal-bd">'+body+'</div>'+
+    '<div id="modal-err" style="display:none;margin:0 24px 4px;padding:8px 12px;background:var(--rdb);border:1px solid #FECACA;border-radius:var(--r);font-size:12px;color:var(--rd)"></div>'+
     '<div class="modal-ft">'+
     '<button class="btn btn-s" onclick="closeModal()">Cancel</button>'+saveBtn+
     '</div></div></div>';
@@ -905,380 +920,283 @@ function overlayClick(e){if(e.target===e.currentTarget)closeModal();}
 // ─── ACTIONS ─────────────────────────────────────────────────────────────────
 function switchTab(t){App.tab=t;if(t==='tasks')App.tasksView='year';render();}
 function selectProp(id){App.selectedId=id;render();}
-function openModal(type,payload){App.modal={type:type,payload:payload};render();}
-function closeModal(){App.modal=null;render();}
-function toggleNR(){var el=document.getElementById('nrFields');if(el)el.style.display=gc('f-nr')?'block':'none';}
+function openModal(type,payload){_resetSaving();App.modal={type:type,payload:payload};render();}
+function closeModal(){_resetSaving();App.modal=null;render();}
+function toggleOwnerFields(){var el=document.getElementById('ownerFields');if(el)el.style.display=gc('f-hasOwner')?'block':'none';}
 
 // ─── SAVE HELPERS ─────────────────────────────────────────────────────────────
-// Immediately disable the Save button on first click — synchronous property
-// mutation, no DOM rebuild, safe to call before google.script.run.
-// Prevents double-submit while the RPC is in flight.
-function _disableSaveBtn(){
-  var btn=document.getElementById('modalSaveBtn');
-  if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+// Optimistic update pattern:
+// 1. Validate — show inline error if invalid, do nothing else
+// 2. Update App.data in memory immediately
+// 3. Close modal + render — user sees result right away, no waiting
+// 4. Fire google.script.run LAST — nothing depends on its response
+// 5. On failure — show error banner and reload from server to restore truth
+//
+// This means google.script.run is the last statement executed, with no DOM
+// changes after it. Most reliable pattern for the Apps Script sandbox.
+
+function _showErr(msg){
+  var el=document.getElementById('modal-err');
+  if(el){el.textContent=msg;el.style.display='block';}
 }
 function _onSaveFail(e){
-  alert('Save error: '+(e.message||e));
+  var msg=(e&&e.message)||String(e)||'Save error';
+  // Server reported failure — reload from server to restore correct state
+  loadData(function(){ render(); setTimeout(function(){ alert('Save failed: '+msg+'\n\nData has been reloaded from the server.'); },0); }, true);
 }
 
-// Settings
+// Settings — no required fields, just fire
 function doSaveSettings(){
-  _disableSaveBtn();
   var s={hoaName:gv('f-hoaNm'),duesAmount:gv('f-duesAmt'),duesDueDate:gv('f-duesDue'),
     hoaAddress:gv('f-hoaAddr'),hoaPhone:gv('f-hoaPhone'),appUrl:gv('f-appUrl')};
-  google.script.run
-    .withSuccessHandler(function(){
-      Object.assign(App.data.settings, s);
-      App.modal=null; setTimeout(render,0);
-    })
-    .withFailureHandler(_onSaveFail)
-    .updateSettings(s);
+  // Optimistic update
+  Object.assign(App.data.settings, s);
+  App.modal=null; render();
+  google.script.run.withFailureHandler(_onSaveFail).updateSettings(s);
 }
 
 // Property
 function doSaveProperty(){
-  _disableSaveBtn();
-  var addr=gv('f-addr'),own=gv('f-owNm');
-  if(!addr){alert('Address is required.');return;}
-  if(!own){alert('Owner name is required.');return;}
-  var pd={address:addr,lotNumber:gv('f-lot'),ownerName:own,ownerEmail:gv('f-owEm'),ownerPhone:gv('f-owPh'),
-    moveInDate:gv('f-mvIn'),duesStatus:gv('f-dues'),ownerOccupied:gc('f-nr')?'no':'yes',
-    contactName:gv('f-cNm'),contactPhone:gv('f-cPh'),contactEmail:gv('f-cEm'),contactAddress:gv('f-cAd'),
-    notes:gv('f-notes'),status:gv('f-status')};
+  var addr=gv('f-addr'),res=gv('f-resNm');
+  if(!addr){_showErr('Address is required.');return;}
+  if(!res){_showErr('Resident name is required.');return;}
+  var hasOwner=gc('f-hasOwner');
+  var pd={
+    address:addr, lotNumber:gv('f-lot'),
+    moveInDate:gv('f-mvIn'), duesStatus:gv('f-dues'), status:gv('f-status'),
+    residentName:res, residentEmail:gv('f-resEm'), residentPhone:gv('f-resPh'),
+    residentNotes:document.getElementById('f-resNt')?document.getElementById('f-resNt').value.trim():'',
+    hasOwner:hasOwner?'yes':'no',
+    ownerName:hasOwner?gv('f-owNm'):'', ownerBusiness:hasOwner?gv('f-owBiz'):'',
+    ownerEmail:hasOwner?gv('f-owEm'):'', ownerPhone:hasOwner?gv('f-owPh'):'',
+    ownerAddress:hasOwner?gv('f-owAddr'):'',
+    ownerNotes:hasOwner?(document.getElementById('f-owNt')?document.getElementById('f-owNt').value.trim():''):''
+  };
   var isEdit=App.modal.type==='editProperty';
   if(isEdit){
     pd.id=App.modal.payload.id;
-    google.script.run
-      .withSuccessHandler(function(){
-        var idx=App.data.properties.findIndex(function(x){return x.id===pd.id;});
-        if(idx>-1) Object.assign(App.data.properties[idx], pd);
-        App.modal=null; setTimeout(render,0);
-      })
-      .withFailureHandler(_onSaveFail)
-      .updateProperty(pd);
+    var idx=App.data.properties.findIndex(function(x){return x.id===pd.id;});
+    if(idx>-1) Object.assign(App.data.properties[idx], pd);
+    App.modal=null; render();
+    google.script.run.withFailureHandler(_onSaveFail).updateProperty(pd);
   } else {
+    // For add, we need a real ID from the server — use a temp ID optimistically
+    var tempId='tmp_'+Date.now();
+    pd.id=tempId; pd.payments=[]; pd.violations=[]; pd.docs=[];
+    App.data.properties.push(pd);
+    App.selectedId=tempId;
+    App.modal=null; render();
     google.script.run
-      .withSuccessHandler(function(newId){
-        pd.id=newId; pd.payments=[]; pd.violations=[]; pd.docs=[];
-        App.data.properties.push(pd);
-        App.selectedId=newId;
-        App.modal=null; setTimeout(render,0);
+      .withSuccessHandler(function(realId){
+        // Patch temp ID to real server ID
+        var p=App.data.properties.find(function(x){return x.id===tempId;});
+        if(p){p.id=realId; App.selectedId=realId;}
+        setTimeout(render,0);
       })
-      .withFailureHandler(_onSaveFail)
+      .withFailureHandler(function(e){
+        // Remove optimistic entry on failure
+        App.data.properties=App.data.properties.filter(function(x){return x.id!==tempId;});
+        App.selectedId=App.data.properties.length?App.data.properties[0].id:null;
+        setTimeout(function(){render();alert('Save failed: '+((e&&e.message)||String(e)));},0);
+      })
       .addProperty(pd);
   }
 }
 function doDeleteProperty(id){
   var p=App.data.properties.find(function(x){return x.id===id;});
   if(!confirm('Remove "'+((p&&p.address)||id)+'" and ALL its records? This cannot be undone.'))return;
-  google.script.run
-    .withSuccessHandler(function(){
-      App.data.properties=App.data.properties.filter(function(x){return x.id!==id;});
-      App.selectedId=App.data.properties.length?App.data.properties[0].id:null;
-      setTimeout(render,0);
-    })
-    .withFailureHandler(_onSaveFail)
-    .deleteProperty(id);
+  App.data.properties=App.data.properties.filter(function(x){return x.id!==id;});
+  App.selectedId=App.data.properties.length?App.data.properties[0].id:null;
+  render();
+  google.script.run.withFailureHandler(_onSaveFail).deleteProperty(id);
 }
 function doBulkReset(){
   if(!confirm('Reset ALL active properties to Unpaid? This should be done once at the start of a new dues year.'))return;
-  google.script.run
-    .withSuccessHandler(function(n){
-      App.data.properties.forEach(function(p){ if(p.status==='active') p.duesStatus='unpaid'; });
-      setTimeout(function(){ render(); alert(n+' properties reset to Unpaid.'); },0);
-    })
-    .withFailureHandler(_onSaveFail)
-    .bulkResetDues();
+  App.data.properties.forEach(function(p){if(p.status==='active')p.duesStatus='unpaid';});
+  render();
+  google.script.run.withFailureHandler(_onSaveFail).bulkResetDues();
 }
 
 // Payment
 function doSavePayment(){
-  _disableSaveBtn();
-  var amt=gv('f-pmAm');if(!amt){alert('Amount is required.');return;}
+  var amt=gv('f-pmAm');if(!amt){_showErr('Amount is required.');return;}
   var propId=App.modal.payload.id;
-  var pm={date:gv('f-pmDt'),period:gv('f-pmPd'),amount:amt,status:gv('f-pmSt'),note:gv('f-pmNt')};
-  google.script.run
-    .withSuccessHandler(function(newId){
-      pm.id=newId; pm.propertyId=propId;
-      var p=App.data.properties.find(function(x){return x.id===propId;});
-      if(p){ p.payments=p.payments||[]; p.payments.push(pm); }
-      App.modal=null; setTimeout(render,0);
-    })
-    .withFailureHandler(_onSaveFail)
-    .addPayment(propId,pm);
+  var pm={id:'tmp_'+Date.now(),propertyId:propId,date:gv('f-pmDt'),period:gv('f-pmPd'),amount:amt,status:gv('f-pmSt'),note:gv('f-pmNt')};
+  var p=App.data.properties.find(function(x){return x.id===propId;});
+  if(p){p.payments=p.payments||[];p.payments.push(pm);}
+  App.modal=null; render();
+  google.script.run.withFailureHandler(_onSaveFail).addPayment(propId,pm);
 }
 function doDeletePayment(id){
   if(!confirm('Delete this payment?'))return;
-  google.script.run
-    .withSuccessHandler(function(){
-      App.data.properties.forEach(function(p){
-        p.payments=(p.payments||[]).filter(function(x){return x.id!==id;});
-      }); setTimeout(render,0);
-    })
-    .withFailureHandler(_onSaveFail)
-    .deletePayment(id);
+  App.data.properties.forEach(function(p){p.payments=(p.payments||[]).filter(function(x){return x.id!==id;});});
+  render();
+  google.script.run.withFailureHandler(_onSaveFail).deletePayment(id);
 }
 
 // Violation
 function doSaveViolation(){
-  _disableSaveBtn();
-  var desc=gv('f-viDsc');if(!desc){alert('Description is required.');return;}
+  var desc=gv('f-viDsc');if(!desc){_showErr('Description is required.');return;}
   var propId=App.modal.payload.id;
-  var v={date:gv('f-viDt'),description:desc,status:gv('f-viSt')};
-  google.script.run
-    .withSuccessHandler(function(newId){
-      v.id=newId; v.propertyId=propId;
-      var p=App.data.properties.find(function(x){return x.id===propId;});
-      if(p){ p.violations=p.violations||[]; p.violations.push(v); }
-      App.modal=null; setTimeout(render,0);
-    })
-    .withFailureHandler(_onSaveFail)
-    .addViolation(propId,v);
+  var v={id:'tmp_'+Date.now(),propertyId:propId,date:gv('f-viDt'),description:desc,status:gv('f-viSt')};
+  var p=App.data.properties.find(function(x){return x.id===propId;});
+  if(p){p.violations=p.violations||[];p.violations.push(v);}
+  App.modal=null; render();
+  google.script.run.withFailureHandler(_onSaveFail).addViolation(propId,v);
 }
 function doDeleteViolation(id){
   if(!confirm('Delete this violation/note?'))return;
-  google.script.run
-    .withSuccessHandler(function(){
-      App.data.properties.forEach(function(p){
-        p.violations=(p.violations||[]).filter(function(x){return x.id!==id;});
-      }); setTimeout(render,0);
-    })
-    .withFailureHandler(_onSaveFail)
-    .deleteViolation(id);
+  App.data.properties.forEach(function(p){p.violations=(p.violations||[]).filter(function(x){return x.id!==id;});});
+  render();
+  google.script.run.withFailureHandler(_onSaveFail).deleteViolation(id);
 }
 
 // Doc log
 function doSaveDoc(){
-  _disableSaveBtn();
-  var desc=gv('f-dcDsc');if(!desc){alert('Description is required.');return;}
+  var desc=gv('f-dcDsc');if(!desc){_showErr('Description is required.');return;}
   var propId=App.modal.payload.propertyId;
-  var doc={date:gv('f-dcDt'),description:desc};
-  google.script.run
-    .withSuccessHandler(function(newId){
-      doc.id=newId; doc.propertyId=propId;
-      var p=App.data.properties.find(function(x){return x.id===propId;});
-      if(p){ p.docs=p.docs||[]; p.docs.push(doc); }
-      App.modal=null; setTimeout(render,0);
-    })
-    .withFailureHandler(_onSaveFail)
-    .addDoc(propId,doc);
+  var doc={id:'tmp_'+Date.now(),propertyId:propId,date:gv('f-dcDt'),description:desc};
+  var p=App.data.properties.find(function(x){return x.id===propId;});
+  if(p){p.docs=p.docs||[];p.docs.push(doc);}
+  App.modal=null; render();
+  google.script.run.withFailureHandler(_onSaveFail).addDoc(propId,doc);
 }
 function doDeleteDoc(id){
   if(!confirm('Delete this log entry?'))return;
-  google.script.run
-    .withSuccessHandler(function(){
-      App.data.properties.forEach(function(p){
-        p.docs=(p.docs||[]).filter(function(x){return x.id!==id;});
-      }); setTimeout(render,0);
-    })
-    .withFailureHandler(_onSaveFail)
-    .deleteDoc(id);
+  App.data.properties.forEach(function(p){p.docs=(p.docs||[]).filter(function(x){return x.id!==id;});});
+  render();
+  google.script.run.withFailureHandler(_onSaveFail).deleteDoc(id);
 }
 
 // Tasks
 function doSaveTask(type){
-  _disableSaveBtn();
-  var desc=gv('f-tkDsc');if(!desc){alert('Description is required.');return;}
+  var desc=gv('f-tkDsc');if(!desc){_showErr('Description is required.');return;}
   var td={year:gv('f-tkYr')||App.taskYear,month:gv('f-tkMo'),description:desc,
     assignee:gv('f-tkAsgn'),dueDate:gv('f-tkDue'),status:gv('f-tkSt'),notes:gv('f-tkNts')};
   if(type==='editTask'){
     td.id=App.modal.payload.id;
-    google.script.run
-      .withSuccessHandler(function(){
-        var idx=App.data.tasks.findIndex(function(x){return x.id===td.id;});
-        if(idx>-1) App.data.tasks[idx]=td;
-        App.modal=null; setTimeout(render,0);
-      })
-      .withFailureHandler(_onSaveFail)
-      .updateTask(td);
+    var idx=App.data.tasks.findIndex(function(x){return x.id===td.id;});
+    if(idx>-1) App.data.tasks[idx]=td;
+    App.modal=null; render();
+    google.script.run.withFailureHandler(_onSaveFail).updateTask(td);
   } else {
-    google.script.run
-      .withSuccessHandler(function(newId){
-        td.id=newId; App.data.tasks.push(td);
-        App.modal=null; setTimeout(render,0);
-      })
-      .withFailureHandler(_onSaveFail)
-      .addTask(td);
+    td.id='tmp_'+Date.now(); App.data.tasks.push(td);
+    App.modal=null; render();
+    google.script.run.withFailureHandler(_onSaveFail).addTask(td);
   }
 }
 function doToggleTask(id,wasDone){
   var task=App.data.tasks.find(function(t){return t.id===id;});if(!task)return;
-  var newStatus=wasDone?'pending':'done';
-  google.script.run
-    .withSuccessHandler(function(){
-      task.status=newStatus; setTimeout(render,0);
-    })
-    .withFailureHandler(_onSaveFail)
-    .updateTask(Object.assign({},task,{status:newStatus}));
+  task.status=wasDone?'pending':'done'; render();
+  google.script.run.withFailureHandler(_onSaveFail).updateTask(Object.assign({},task));
 }
 function doDeleteTask(id){
   if(!confirm('Delete this task?'))return;
-  google.script.run
-    .withSuccessHandler(function(){
-      App.data.tasks=App.data.tasks.filter(function(x){return x.id!==id;});
-      setTimeout(render,0);
-    })
-    .withFailureHandler(_onSaveFail)
-    .deleteTask(id);
+  App.data.tasks=App.data.tasks.filter(function(x){return x.id!==id;}); render();
+  google.script.run.withFailureHandler(_onSaveFail).deleteTask(id);
 }
 function doLoadYear(){
   var yr=App.taskYear,n=App.data.templates.length;
   if(!n){alert('No template tasks found. Click "✎ Template" to build your annual checklist first.');return;}
   var ex=App.data.tasks.filter(function(t){return String(t.year)===String(yr);}).length;
   if(!confirm('Load template tasks into '+yr+'?'+(ex?' Already-existing tasks will be skipped.':'')))return;
+  App.loading=true; render();
   google.script.run
     .withSuccessHandler(function(r){
-      var msg='Done! '+r.created+' task'+(r.created!==1?'s':'')+' added to '+yr+'.'+(r.skipped?' ('+r.skipped+' already existed, skipped)':'');
-      setTimeout(function(){ loadData(function(){ render(); alert(msg); }); }, 0);
+      var msg='Done! '+r.created+' task'+(r.created!==1?'s':'')+' added to '+yr+'.'+(r.skipped?' ('+r.skipped+' skipped)':'');
+      setTimeout(function(){ loadData(function(){ render(); alert(msg); }); },0);
     })
-    .withFailureHandler(function(e){ var msg=e.message||e; setTimeout(function(){ alert('Error: '+msg); },0); })
+    .withFailureHandler(function(e){ App.loading=false; setTimeout(function(){render();alert('Error: '+((e&&e.message)||e));},0); })
     .loadTasksForYear(yr);
 }
 
 // Templates
 function doSaveTemplate(type){
-  _disableSaveBtn();
-  var desc=gv('f-tmDsc');if(!desc){alert('Description is required.');return;}
+  var desc=gv('f-tmDsc');if(!desc){_showErr('Description is required.');return;}
   var td={month:gv('f-tmMo'),description:desc,assignee:gv('f-tmAsgn'),notes:gv('f-tmNts')};
   if(type==='editTemplate'){
     td.id=App.modal.payload.id;
-    google.script.run
-      .withSuccessHandler(function(){
-        var idx=App.data.templates.findIndex(function(x){return x.id===td.id;});
-        if(idx>-1) App.data.templates[idx]=td;
-        App.modal=null; setTimeout(render,0);
-      })
-      .withFailureHandler(_onSaveFail)
-      .updateTemplate(td);
+    var idx=App.data.templates.findIndex(function(x){return x.id===td.id;});
+    if(idx>-1) App.data.templates[idx]=td;
+    App.modal=null; render();
+    google.script.run.withFailureHandler(_onSaveFail).updateTemplate(td);
   } else {
-    google.script.run
-      .withSuccessHandler(function(newId){
-        td.id=newId; App.data.templates.push(td);
-        App.modal=null; setTimeout(render,0);
-      })
-      .withFailureHandler(_onSaveFail)
-      .addTemplate(td);
+    td.id='tmp_'+Date.now(); App.data.templates.push(td);
+    App.modal=null; render();
+    google.script.run.withFailureHandler(_onSaveFail).addTemplate(td);
   }
 }
 function doDeleteTemplate(id){
   if(!confirm('Remove this task from the annual template?'))return;
-  google.script.run
-    .withSuccessHandler(function(){
-      App.data.templates=App.data.templates.filter(function(x){return x.id!==id;});
-      setTimeout(render,0);
-    })
-    .withFailureHandler(_onSaveFail)
-    .deleteTemplate(id);
+  App.data.templates=App.data.templates.filter(function(x){return x.id!==id;}); render();
+  google.script.run.withFailureHandler(_onSaveFail).deleteTemplate(id);
 }
 
 // Board Members
 function doSaveMember(type){
-  _disableSaveBtn();
-  var nm=gv('f-mbNm');if(!nm){alert('Name is required.');return;}
+  var nm=gv('f-mbNm');if(!nm){_showErr('Name is required.');return;}
   var m={name:nm,role:gv('f-mbRl'),email:gv('f-mbEm'),phone:gv('f-mbPh'),termEnd:gv('f-mbTe'),notes:gv('f-mbNt')};
   if(type==='editMember'){
     m.id=App.modal.payload.id;
-    google.script.run
-      .withSuccessHandler(function(){
-        var idx=App.data.members.findIndex(function(x){return x.id===m.id;});
-        if(idx>-1) App.data.members[idx]=m;
-        App.modal=null; setTimeout(render,0);
-      })
-      .withFailureHandler(_onSaveFail)
-      .updateMember(m);
+    var idx=App.data.members.findIndex(function(x){return x.id===m.id;});
+    if(idx>-1) App.data.members[idx]=m;
+    App.modal=null; render();
+    google.script.run.withFailureHandler(_onSaveFail).updateMember(m);
   } else {
-    google.script.run
-      .withSuccessHandler(function(newId){
-        m.id=newId; App.data.members.push(m);
-        App.modal=null; setTimeout(render,0);
-      })
-      .withFailureHandler(_onSaveFail)
-      .addMember(m);
+    m.id='tmp_'+Date.now(); App.data.members.push(m);
+    App.modal=null; render();
+    google.script.run.withFailureHandler(_onSaveFail).addMember(m);
   }
 }
 function doDeleteMember(id){
   if(!confirm('Remove this board member?'))return;
-  google.script.run
-    .withSuccessHandler(function(){
-      App.data.members=App.data.members.filter(function(x){return x.id!==id;});
-      setTimeout(render,0);
-    })
-    .withFailureHandler(_onSaveFail)
-    .deleteMember(id);
+  App.data.members=App.data.members.filter(function(x){return x.id!==id;}); render();
+  google.script.run.withFailureHandler(_onSaveFail).deleteMember(id);
 }
 
 // Vendors
 function doSaveVendor(type){
-  _disableSaveBtn();
-  var nm=gv('f-vnNm');if(!nm){alert('Name is required.');return;}
+  var nm=gv('f-vnNm');if(!nm){_showErr('Name is required.');return;}
   var v={name:nm,category:gv('f-vnCt'),phone:gv('f-vnPh'),email:gv('f-vnEm'),notes:gv('f-vnNt')};
   if(type==='editVendor'){
     v.id=App.modal.payload.id;
-    google.script.run
-      .withSuccessHandler(function(){
-        var idx=App.data.vendors.findIndex(function(x){return x.id===v.id;});
-        if(idx>-1) App.data.vendors[idx]=v;
-        App.modal=null; setTimeout(render,0);
-      })
-      .withFailureHandler(_onSaveFail)
-      .updateVendor(v);
+    var idx=App.data.vendors.findIndex(function(x){return x.id===v.id;});
+    if(idx>-1) App.data.vendors[idx]=v;
+    App.modal=null; render();
+    google.script.run.withFailureHandler(_onSaveFail).updateVendor(v);
   } else {
-    google.script.run
-      .withSuccessHandler(function(newId){
-        v.id=newId; App.data.vendors.push(v);
-        App.modal=null; setTimeout(render,0);
-      })
-      .withFailureHandler(_onSaveFail)
-      .addVendor(v);
+    v.id='tmp_'+Date.now(); App.data.vendors.push(v);
+    App.modal=null; render();
+    google.script.run.withFailureHandler(_onSaveFail).addVendor(v);
   }
 }
 function doDeleteVendor(id){
   if(!confirm('Remove this vendor?'))return;
-  google.script.run
-    .withSuccessHandler(function(){
-      App.data.vendors=App.data.vendors.filter(function(x){return x.id!==id;});
-      setTimeout(render,0);
-    })
-    .withFailureHandler(_onSaveFail)
-    .deleteVendor(id);
+  App.data.vendors=App.data.vendors.filter(function(x){return x.id!==id;}); render();
+  google.script.run.withFailureHandler(_onSaveFail).deleteVendor(id);
 }
 
 // Minutes
 function doSaveMinutes(type){
-  _disableSaveBtn();
   var mn={date:gv('f-mnDt'),title:gv('f-mnTl'),attendees:gv('f-mnAt'),notes:gv('f-mnNt')};
   if(type==='editMinutes'){
     mn.id=App.modal.payload.id;
-    google.script.run
-      .withSuccessHandler(function(){
-        var idx=App.data.minutes.findIndex(function(x){return x.id===mn.id;});
-        if(idx>-1) App.data.minutes[idx]=mn;
-        App.modal=null; setTimeout(render,0);
-      })
-      .withFailureHandler(_onSaveFail)
-      .updateMinutes(mn);
+    var idx=App.data.minutes.findIndex(function(x){return x.id===mn.id;});
+    if(idx>-1) App.data.minutes[idx]=mn;
+    App.modal=null; render();
+    google.script.run.withFailureHandler(_onSaveFail).updateMinutes(mn);
   } else {
-    google.script.run
-      .withSuccessHandler(function(newId){
-        mn.id=newId; App.data.minutes.push(mn);
-        App.modal=null; setTimeout(render,0);
-      })
-      .withFailureHandler(_onSaveFail)
-      .addMinutes(mn);
+    mn.id='tmp_'+Date.now(); App.data.minutes.push(mn);
+    App.modal=null; render();
+    google.script.run.withFailureHandler(_onSaveFail).addMinutes(mn);
   }
 }
 function doDeleteMinutes(id){
   if(!confirm('Delete these meeting minutes?'))return;
-  google.script.run
-    .withSuccessHandler(function(){
-      App.data.minutes=App.data.minutes.filter(function(x){return x.id!==id;});
-      setTimeout(render,0);
-    })
-    .withFailureHandler(_onSaveFail)
-    .deleteMinutes(id);
+  App.data.minutes=App.data.minutes.filter(function(x){return x.id!==id;}); render();
+  google.script.run.withFailureHandler(_onSaveFail).deleteMinutes(id);
 }
-
-// Settings
+// Property
 // Violation notice
 function doCopyNotice(){
   var el=document.getElementById('noticeText');
@@ -1314,14 +1232,16 @@ function doExportJSON(){
   a.download='hoa-data.json';a.click();
 }
 function doExportCSV(){
-  var rows=[['Address','Lot#','Owner','Email','Phone','Move-in','Dues','Status','Contact Name','Contact Phone','Notes','Open Violations','Total Paid This Year']];
+  var rows=[['Address','Lot#','Resident','Resident Email','Resident Phone','Move-in','Dues Status','Property Status','Owner Name','Owner Business','Owner Email','Owner Phone','Owner Address','Open Violations','Total Paid This Year']];
   var yr=new Date().getFullYear();
   App.data.properties.forEach(function(p){
     var ov=(p.violations||[]).filter(function(v){return v.status==='open';}).length;
     var tot=(p.payments||[]).filter(function(pm){return String((pm.date||'').substring(0,4))===String(yr);})
       .reduce(function(s,pm){return s+parseFloat(pm.amount||0);},0);
-    rows.push([p.address,p.lotNumber||'',p.ownerName,p.ownerEmail||'',p.ownerPhone||'',p.moveInDate||'',
-      p.duesStatus,p.status||'active',p.contactName||'',p.contactPhone||'',p.notes||'',ov,tot.toFixed(2)]);
+    rows.push([p.address,p.lotNumber||'',p.residentName||'',p.residentEmail||'',p.residentPhone||'',
+      p.moveInDate||'',p.duesStatus,p.status||'active',
+      p.ownerName||'',p.ownerBusiness||'',p.ownerEmail||'',p.ownerPhone||'',p.ownerAddress||'',
+      ov,tot.toFixed(2)]);
   });
   var csv=rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
   var a=document.createElement('a');
@@ -1336,108 +1256,280 @@ document.addEventListener('DOMContentLoaded',function(){
   });
 });
 </script>
-</body>
-</html>
 
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     TEST HARNESS — Mock google.script.run
+     Open this file directly in Chrome. No Google account needed.
+     Uses the new resident/owner data model matching Code.gs + Index.html.
+     ═══════════════════════════════════════════════════════════════════════════ -->
 <script>
 (function(){
-  var DELAY=500;
-  var _db={
-    settings:{hoaName:'Maplewood Estates HOA',duesAmount:'300',duesDueDate:'March 1',
-      hoaAddress:'1 Maplewood Drive, Anytown ST 00000',hoaPhone:'(555) 000-0100',appUrl:''},
-    properties:[
-      {id:'p1',address:'100 Maplewood Drive',lotNumber:'1',ownerName:'Alice Johnson',ownerEmail:'alice@example.com',
-       ownerPhone:'(555) 000-0101',moveInDate:'2018-05-01',duesStatus:'paid',ownerOccupied:'yes',
-       contactName:'',contactPhone:'',contactEmail:'',contactAddress:'',notes:'',status:'active',
-       payments:[{id:'pm1',propertyId:'p1',date:'2026-02-15',period:'2026',amount:'300',status:'paid',note:'Check #1001'}],
-       violations:[],docs:[]},
-      {id:'p2',address:'102 Maplewood Drive',lotNumber:'2',ownerName:"Bob O'Brien",ownerEmail:'bob@example.com',
-       ownerPhone:'(555) 000-0202',moveInDate:'2020-11-15',duesStatus:'unpaid',ownerOccupied:'no',
-       contactName:"Robert O'Brien",contactPhone:'(555) 000-9999',contactEmail:'robert@example.com',
-       contactAddress:'500 Other Street, Othertown ST 00001',notes:'Rental property',status:'active',
-       payments:[],
-       violations:[{id:'v1',propertyId:'p2',date:'2026-01-10',description:'Unsecured trash bins left on curb for 4+ days',status:'open'}],
-       docs:[{id:'d1',propertyId:'p2',date:'2026-01-12',description:'Violation notice mailed certified mail, tracking #94001118992234'}]},
-      {id:'p3',address:'104 Maplewood Drive',lotNumber:'3',ownerName:'Carol Martinez',ownerEmail:'carol@example.com',
-       ownerPhone:'(555) 000-0303',moveInDate:'2022-03-20',duesStatus:'partial',ownerOccupied:'yes',
-       contactName:'',contactPhone:'',contactEmail:'',contactAddress:'',notes:'',status:'active',
-       payments:[{id:'pm2',propertyId:'p3',date:'2026-01-30',period:'2026',amount:'150',status:'partial',note:'Balance promised by April'}],
-       violations:[],docs:[]},
-      {id:'p4',address:'106 Maplewood Drive',lotNumber:'4',ownerName:'Previous Owner',ownerEmail:'',
-       ownerPhone:'',moveInDate:'2015-01-01',duesStatus:'paid',ownerOccupied:'yes',
-       contactName:'',contactPhone:'',contactEmail:'',contactAddress:'',notes:'Sold 2025',status:'sold',
-       payments:[],violations:[],docs:[]}
+  var DELAY = 400; // simulated server latency in ms
+
+  // ── Seed Data (new model: residentName / hasOwner) ─────────────────────────
+  var _db = {
+    settings: {
+      hoaName:     'Maplewood Estates HOA',
+      duesAmount:  '300',
+      duesDueDate: 'March 1',
+      hoaAddress:  '1 Maplewood Drive, Anytown, ST 00000',
+      hoaPhone:    '(555) 000-0100',
+      appUrl:      ''
+    },
+    properties: [
+      // Resident = owner, fully paid
+      { id:'p1', address:'100 Maplewood Drive', lotNumber:'1',
+        residentName:'Alice Johnson', residentEmail:'alice@example.com',
+        residentPhone:'(555) 000-0101', residentNotes:'',
+        moveInDate:'2018-05-01', duesStatus:'paid', status:'active',
+        hasOwner:'no',
+        ownerName:'', ownerBusiness:'', ownerEmail:'',
+        ownerPhone:'', ownerAddress:'', ownerNotes:'',
+        payments:[{id:'pm1',propertyId:'p1',date:'2026-02-15',period:'2026',amount:'300',status:'paid',note:'Check #1001'}],
+        violations:[], docs:[] },
+
+      // Rental — resident ≠ owner, open violation
+      { id:'p2', address:'102 Maplewood Drive', lotNumber:'2',
+        residentName:'Jane Tenant', residentEmail:'jane@example.com',
+        residentPhone:'(555) 000-0202', residentNotes:'Month-to-month lease',
+        moveInDate:'2021-06-01', duesStatus:'unpaid', status:'active',
+        hasOwner:'yes',
+        ownerName:"Bob O'Brien", ownerBusiness:'OBrien Properties LLC',
+        ownerEmail:'bob@example.com', ownerPhone:'(555) 000-9999',
+        ownerAddress:'500 Other Street, Othertown, ST 00001', ownerNotes:'Rental property',
+        payments:[],
+        violations:[{id:'v1',propertyId:'p2',date:'2026-01-10',
+          description:'Unsecured trash bins left on curb for 4+ days',status:'open'}],
+        docs:[{id:'d1',propertyId:'p2',date:'2026-01-12',
+          description:'Violation notice mailed certified mail, tracking #94001118992234'}] },
+
+      // Partial payer
+      { id:'p3', address:'104 Maplewood Drive', lotNumber:'3',
+        residentName:'Carol Martinez', residentEmail:'carol@example.com',
+        residentPhone:'(555) 000-0303', residentNotes:'',
+        moveInDate:'2022-03-20', duesStatus:'partial', status:'active',
+        hasOwner:'no',
+        ownerName:'', ownerBusiness:'', ownerEmail:'',
+        ownerPhone:'', ownerAddress:'', ownerNotes:'',
+        payments:[{id:'pm2',propertyId:'p3',date:'2026-01-30',period:'2026',amount:'150',status:'partial',note:'Balance promised by April'}],
+        violations:[], docs:[] },
+
+      // Sold property — should appear only with "Show inactive/sold" checked
+      { id:'p4', address:'106 Maplewood Drive', lotNumber:'4',
+        residentName:'Previous Owner', residentEmail:'',
+        residentPhone:'', residentNotes:'Sold 2025',
+        moveInDate:'2015-01-01', duesStatus:'paid', status:'sold',
+        hasOwner:'no',
+        ownerName:'', ownerBusiness:'', ownerEmail:'',
+        ownerPhone:'', ownerAddress:'', ownerNotes:'',
+        payments:[], violations:[], docs:[] }
     ],
-    tasks:[
-      {id:'t1',year:'2026',month:'1',description:'Send annual dues notices to all homeowners',assignee:'Treasurer',dueDate:'2026-01-15',status:'done',notes:''},
-      {id:'t2',year:'2026',month:'3',description:'Begin dues collection — contact delinquent owners',assignee:'President',dueDate:'2026-03-15',status:'pending',notes:'Check unpaid after 60 days'},
-      {id:'t3',year:'2026',month:'4',description:'Spring common area inspection',assignee:'',dueDate:'2026-04-15',status:'pending',notes:'Document any violations found'}
+    tasks: [
+      { id:'t1', year:'2026', month:'1', description:'Send annual dues notices to all homeowners',
+        assignee:'Treasurer', dueDate:'2026-01-15', status:'done', notes:'' },
+      { id:'t2', year:'2026', month:'3', description:'Begin dues collection — contact delinquent owners',
+        assignee:'President', dueDate:'2026-03-15', status:'pending', notes:'Check unpaid after 60 days' },
+      { id:'t3', year:'2026', month:'4', description:'Spring common area inspection',
+        assignee:'', dueDate:'2026-04-15', status:'pending', notes:'Document any violations found' }
     ],
-    templates:[
-      {id:'tmpl1',month:'1',description:'Send annual dues notices to all homeowners',assignee:'Treasurer',notes:'Send by mail and email'},
-      {id:'tmpl2',month:'2',description:'Follow up on unpaid dues',assignee:'Treasurer',notes:''},
-      {id:'tmpl3',month:'3',description:'Begin dues collection — contact delinquent owners',assignee:'President',notes:'Check unpaid after 60 days'},
-      {id:'tmpl4',month:'4',description:'Spring common area inspection',assignee:'',notes:'Document any violations found'},
-      {id:'tmpl5',month:'9',description:'Annual homeowners meeting',assignee:'President',notes:''},
-      {id:'tmpl6',month:'10',description:'Budget planning for next year',assignee:'Treasurer',notes:''},
-      {id:'tmpl7',month:'12',description:'Year-end financial summary',assignee:'Treasurer',notes:'Prepare for records'}
+    templates: [
+      { id:'tmpl1', month:'1',  description:'Send annual dues notices to all homeowners', assignee:'Treasurer',  notes:'Send by mail and email' },
+      { id:'tmpl2', month:'2',  description:'Follow up on unpaid dues',                   assignee:'Treasurer',  notes:'' },
+      { id:'tmpl3', month:'3',  description:'Begin dues collection — contact delinquent owners', assignee:'President', notes:'Check unpaid after 60 days' },
+      { id:'tmpl4', month:'4',  description:'Spring common area inspection',              assignee:'',           notes:'Document any violations found' },
+      { id:'tmpl5', month:'5',  description:'Send violation notices if applicable',       assignee:'President',  notes:'Allow 30 days to remediate' },
+      { id:'tmpl6', month:'6',  description:'Mid-year financial review',                  assignee:'Treasurer',  notes:'Review budget vs actuals' },
+      { id:'tmpl7', month:'9',  description:'Annual homeowners meeting',                  assignee:'President',  notes:'' },
+      { id:'tmpl8', month:'10', description:'Budget planning for next year',              assignee:'Treasurer',  notes:'' },
+      { id:'tmpl9', month:'12', description:'Year-end financial summary',                 assignee:'Treasurer',  notes:'Prepare for records' }
     ],
-    members:[
-      {id:'mb1',name:'Alice Johnson',role:'President',email:'alice@example.com',phone:'(555) 000-0101',termEnd:'2026-12-31',notes:''},
-      {id:'mb2',name:'David Lee',role:'Treasurer',email:'david@example.com',phone:'(555) 000-0404',termEnd:'2027-06-30',notes:''}
+    members: [
+      { id:'mb1', name:'Alice Johnson', role:'President',  email:'alice@example.com', phone:'(555) 000-0101', termEnd:'2026-12-31', notes:'' },
+      { id:'mb2', name:'David Lee',     role:'Treasurer',  email:'david@example.com', phone:'(555) 000-0404', termEnd:'2027-06-30', notes:'' }
     ],
-    vendors:[
-      {id:'vn1',name:'Green Thumb Landscaping',category:'Landscaping',phone:'(555) 000-2001',email:'greenthumb@example.com',notes:'Call 48hrs before service'},
-      {id:'vn2',name:'SecureGate Systems',category:'Gate & Entry',phone:'(555) 000-2002',email:'',notes:'Gate code: 0000, emergency ext 3'}
+    vendors: [
+      { id:'vn1', name:'Green Thumb Landscaping', category:'Landscaping',   phone:'(555) 000-2001', email:'greenthumb@example.com', notes:'Call 48hrs before service' },
+      { id:'vn2', name:'SecureGate Systems',      category:'Gate & Entry',  phone:'(555) 000-2002', email:'',                       notes:'Emergency ext 3' }
     ],
-    minutes:[
-      {id:'mn1',date:'2026-01-15',title:'January Board Meeting',attendees:'Alice Johnson, David Lee',notes:'1. Approved 2026 budget unanimously.\n2. Voted to send dues notices by Jan 20.\nNext meeting: February 19'}
+    minutes: [
+      { id:'mn1', date:'2026-01-15', title:'January Board Meeting',
+        attendees:'Alice Johnson, David Lee',
+        notes:'1. Approved 2026 budget unanimously.\n2. Voted to send dues notices by Jan 20.\nNext meeting: February 19' }
     ]
   };
-  function makeRunner(){
-    var _s,_f;
-    var r={withSuccessHandler:function(fn){_s=fn;return r;},withFailureHandler:function(fn){_f=fn;return r;}};
-    function ok(v){setTimeout(function(){try{if(_s)_s(v);}catch(e){if(_f)_f(e);}},DELAY);}
-    r.getAllData=function(){ok(JSON.parse(JSON.stringify(_db)));};
-    r.updateSettings=function(s){Object.assign(_db.settings,s);ok(true);};
-    r.addProperty=function(p){p.id='p'+Date.now();p.payments=[];p.violations=[];p.docs=[];_db.properties.push(p);ok(p.id);};
-    r.updateProperty=function(p){var i=_db.properties.findIndex(function(x){return x.id===p.id;});if(i>-1)Object.assign(_db.properties[i],p);ok(true);};
-    r.deleteProperty=function(id){_db.properties=_db.properties.filter(function(x){return x.id!==id;});ok(true);};
-    r.bulkResetDues=function(){var n=0;_db.properties.forEach(function(p){if(p.status==='active'){p.duesStatus='unpaid';n++;}});ok(n);};
-    r.addPayment=function(pid,pm){pm.id='pm'+Date.now();pm.propertyId=pid;var p=_db.properties.find(function(x){return x.id===pid;});if(p){p.payments=p.payments||[];p.payments.push(pm);}ok(pm.id);};
-    r.deletePayment=function(id){_db.properties.forEach(function(p){p.payments=(p.payments||[]).filter(function(x){return x.id!==id;});});ok(true);};
-    r.addViolation=function(pid,v){v.id='v'+Date.now();v.propertyId=pid;var p=_db.properties.find(function(x){return x.id===pid;});if(p){p.violations=p.violations||[];p.violations.push(v);}ok(v.id);};
-    r.deleteViolation=function(id){_db.properties.forEach(function(p){p.violations=(p.violations||[]).filter(function(x){return x.id!==id;});});ok(true);};
-    r.addDoc=function(pid,d){d.id='d'+Date.now();d.propertyId=pid;var p=_db.properties.find(function(x){return x.id===pid;});if(p){p.docs=p.docs||[];p.docs.push(d);}ok(d.id);};
-    r.deleteDoc=function(id){_db.properties.forEach(function(p){p.docs=(p.docs||[]).filter(function(x){return x.id!==id;});});ok(true);};
-    r.addTask=function(t){t.id='tk'+Date.now();_db.tasks.push(t);ok(t.id);};
-    r.updateTask=function(t){var i=_db.tasks.findIndex(function(x){return x.id===t.id;});if(i>-1)_db.tasks[i]=t;ok(true);};
-    r.deleteTask=function(id){_db.tasks=_db.tasks.filter(function(x){return x.id!==id;});ok(true);};
-    r.loadTasksForYear=function(yr){
-      var ex=_db.tasks.filter(function(t){return String(t.year)===String(yr);}).map(function(t){return t.description.trim().toLowerCase();});
-      var c=0,s=0;
-      _db.templates.forEach(function(tm){
-        if(ex.includes(tm.description.trim().toLowerCase())){s++;return;}
-        _db.tasks.push({id:'tk'+Date.now()+'_'+Math.random(),year:yr,month:tm.month,description:tm.description,assignee:tm.assignee||'',dueDate:'',status:'pending',notes:tm.notes||''});
-        c++;
-      });
-      ok({created:c,skipped:s});
+
+  // ── Mock Runner ────────────────────────────────────────────────────────────
+  function makeRunner() {
+    var _s, _f;
+    var r = {
+      withSuccessHandler: function(fn){ _s=fn; return r; },
+      withFailureHandler: function(fn){ _f=fn; return r; }
     };
-    r.addTemplate=function(t){t.id='tmpl'+Date.now();_db.templates.push(t);ok(t.id);};
-    r.updateTemplate=function(t){var i=_db.templates.findIndex(function(x){return x.id===t.id;});if(i>-1)_db.templates[i]=t;ok(true);};
-    r.deleteTemplate=function(id){_db.templates=_db.templates.filter(function(x){return x.id!==id;});ok(true);};
-    r.addMember=function(m){m.id='mb'+Date.now();_db.members.push(m);ok(m.id);};
-    r.updateMember=function(m){var i=_db.members.findIndex(function(x){return x.id===m.id;});if(i>-1)_db.members[i]=m;ok(true);};
-    r.deleteMember=function(id){_db.members=_db.members.filter(function(x){return x.id!==id;});ok(true);};
-    r.addVendor=function(v){v.id='vn'+Date.now();_db.vendors.push(v);ok(v.id);};
-    r.updateVendor=function(v){var i=_db.vendors.findIndex(function(x){return x.id===v.id;});if(i>-1)_db.vendors[i]=v;ok(true);};
-    r.deleteVendor=function(id){_db.vendors=_db.vendors.filter(function(x){return x.id!==id;});ok(true);};
-    r.addMinutes=function(m){m.id='mn'+Date.now();_db.minutes.push(m);ok(m.id);};
-    r.updateMinutes=function(m){var i=_db.minutes.findIndex(function(x){return x.id===m.id;});if(i>-1)_db.minutes[i]=m;ok(true);};
-    r.deleteMinutes=function(id){_db.minutes=_db.minutes.filter(function(x){return x.id!==id;});ok(true);};
+    function ok(val){
+      setTimeout(function(){
+        try{ if(_s) _s(val); }
+        catch(e){ if(_f) _f(e); }
+      }, DELAY);
+    }
+
+    // Settings
+    r.getAllData = function(){
+      ok(JSON.parse(JSON.stringify(_db)));
+    };
+    r.updateSettings = function(s){
+      Object.assign(_db.settings, s); ok(true);
+    };
+
+    // Properties
+    r.addProperty = function(p){
+      p.id = 'p'+Date.now();
+      p.payments=[]; p.violations=[]; p.docs=[];
+      _db.properties.push(p); ok(p.id);
+    };
+    r.updateProperty = function(p){
+      var i=_db.properties.findIndex(function(x){return x.id===p.id;});
+      if(i>-1) Object.assign(_db.properties[i], p);
+      ok(true);
+    };
+    r.deleteProperty = function(id){
+      _db.properties=_db.properties.filter(function(x){return x.id!==id;});
+      ok(true);
+    };
+    r.bulkResetDues = function(){
+      var n=0;
+      _db.properties.forEach(function(p){ if(p.status==='active'){p.duesStatus='unpaid';n++;} });
+      ok(n);
+    };
+
+    // Payments
+    r.addPayment = function(pid, pm){
+      pm.id='pm'+Date.now(); pm.propertyId=pid;
+      var p=_db.properties.find(function(x){return x.id===pid;});
+      if(p){ p.payments=p.payments||[]; p.payments.push(pm); }
+      ok(pm.id);
+    };
+    r.deletePayment = function(id){
+      _db.properties.forEach(function(p){
+        p.payments=(p.payments||[]).filter(function(x){return x.id!==id;});
+      }); ok(true);
+    };
+
+    // Violations
+    r.addViolation = function(pid, v){
+      v.id='v'+Date.now(); v.propertyId=pid;
+      var p=_db.properties.find(function(x){return x.id===pid;});
+      if(p){ p.violations=p.violations||[]; p.violations.push(v); }
+      ok(v.id);
+    };
+    r.deleteViolation = function(id){
+      _db.properties.forEach(function(p){
+        p.violations=(p.violations||[]).filter(function(x){return x.id!==id;});
+      }); ok(true);
+    };
+
+    // Docs
+    r.addDoc = function(pid, d){
+      d.id='d'+Date.now(); d.propertyId=pid;
+      var p=_db.properties.find(function(x){return x.id===pid;});
+      if(p){ p.docs=p.docs||[]; p.docs.push(d); }
+      ok(d.id);
+    };
+    r.deleteDoc = function(id){
+      _db.properties.forEach(function(p){
+        p.docs=(p.docs||[]).filter(function(x){return x.id!==id;});
+      }); ok(true);
+    };
+
+    // Tasks
+    r.addTask = function(t){
+      t.id='tk'+Date.now(); _db.tasks.push(t); ok(t.id);
+    };
+    r.updateTask = function(t){
+      var i=_db.tasks.findIndex(function(x){return x.id===t.id;});
+      if(i>-1) _db.tasks[i]=t; ok(true);
+    };
+    r.deleteTask = function(id){
+      _db.tasks=_db.tasks.filter(function(x){return x.id!==id;}); ok(true);
+    };
+    r.loadTasksForYear = function(yr){
+      var ex=_db.tasks
+        .filter(function(t){return String(t.year)===String(yr);})
+        .map(function(t){return t.description.trim().toLowerCase();});
+      var created=0, skipped=0;
+      _db.templates.forEach(function(tm){
+        if(ex.includes(tm.description.trim().toLowerCase())){ skipped++; return; }
+        _db.tasks.push({
+          id:'tk'+Date.now()+'_'+Math.random(), year:yr, month:tm.month,
+          description:tm.description, assignee:tm.assignee||'',
+          dueDate:'', status:'pending', notes:tm.notes||''
+        });
+        created++;
+      });
+      ok({created:created, skipped:skipped});
+    };
+
+    // Templates
+    r.addTemplate = function(t){
+      t.id='tmpl'+Date.now(); _db.templates.push(t); ok(t.id);
+    };
+    r.updateTemplate = function(t){
+      var i=_db.templates.findIndex(function(x){return x.id===t.id;});
+      if(i>-1) _db.templates[i]=t; ok(true);
+    };
+    r.deleteTemplate = function(id){
+      _db.templates=_db.templates.filter(function(x){return x.id!==id;}); ok(true);
+    };
+
+    // Board Members
+    r.addMember = function(m){
+      m.id='mb'+Date.now(); _db.members.push(m); ok(m.id);
+    };
+    r.updateMember = function(m){
+      var i=_db.members.findIndex(function(x){return x.id===m.id;});
+      if(i>-1) _db.members[i]=m; ok(true);
+    };
+    r.deleteMember = function(id){
+      _db.members=_db.members.filter(function(x){return x.id!==id;}); ok(true);
+    };
+
+    // Vendors
+    r.addVendor = function(v){
+      v.id='vn'+Date.now(); _db.vendors.push(v); ok(v.id);
+    };
+    r.updateVendor = function(v){
+      var i=_db.vendors.findIndex(function(x){return x.id===v.id;});
+      if(i>-1) _db.vendors[i]=v; ok(true);
+    };
+    r.deleteVendor = function(id){
+      _db.vendors=_db.vendors.filter(function(x){return x.id!==id;}); ok(true);
+    };
+
+    // Minutes
+    r.addMinutes = function(m){
+      m.id='mn'+Date.now(); _db.minutes.push(m); ok(m.id);
+    };
+    r.updateMinutes = function(m){
+      var i=_db.minutes.findIndex(function(x){return x.id===m.id;});
+      if(i>-1) _db.minutes[i]=m; ok(true);
+    };
+    r.deleteMinutes = function(id){
+      _db.minutes=_db.minutes.filter(function(x){return x.id!==id;}); ok(true);
+    };
+
     return r;
   }
-  window.google={script:{run:new Proxy({},{get:function(){return makeRunner();}})}};
-  console.log('[HARNESS] Mock ready — '+DELAY+'ms simulated latency');
+
+  // ── Expose as window.google.script.run ────────────────────────────────────
+  window.google = {
+    script: {
+      run: new Proxy({}, { get: function(){ return makeRunner(); } })
+    }
+  };
+
+  console.log('[HARNESS] Mock google.script.run ready — ' + DELAY + 'ms simulated latency');
+  console.log('[HARNESS] Seed data: ' + _db.properties.length + ' properties, ' +
+    _db.tasks.length + ' tasks, ' + _db.templates.length + ' templates');
 })();
 </script>
+</body>
+</html>
