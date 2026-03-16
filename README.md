@@ -10,7 +10,7 @@ Fyi:  this is 95% vibe-coded.  Use cautiously.
 
 ## Features
 
-- **Properties** — Track every home: owner info, dues status, non-resident contact details, active/inactive/sold status, search and filter
+- **Properties** — Track every home: resident info, dues status, optional separate owner details (for rentals, trusts, or business-owned properties), active/inactive/sold status, search and filter
 - **Dues & Balances** — Set an annual dues amount and see each property's assessed vs. paid vs. balance due in real time
 - **Payments** — Full payment history per property with date, period, amount, and status
 - **Violations** — Log and track violations per property, generate a pre-filled formal violation notice with one click
@@ -20,7 +20,7 @@ Fyi:  this is 95% vibe-coded.  Use cautiously.
 - **Board Members** — Roster with roles, contact info, and term end dates
 - **Vendors** — Contractor directory (landscaper, gate company, etc.) with account numbers and access codes
 - **Meeting Minutes** — Dated board meeting records with attendees and notes
-- **Reports** — Dues summary, unpaid property list, open violations, one-click BCC-ready email lists for all owners / unpaid owners / non-resident contacts
+- **Reports** — Dues summary, unpaid property list, open violations, one-click BCC-ready email lists for all residents / unpaid residents / owner emails where different from resident
 - **Bulk Actions** — Reset all dues to Unpaid at the start of a new year
 - **Export** — Full data JSON export, property summary CSV
 - **Settings** — HOA name, dues amount, due date, address, phone, and a short URL shown in the header
@@ -114,7 +114,7 @@ Google Sheet (data store)
 | Sheet | Purpose |
 |---|---|
 | Settings | Key/value pairs (HOA name, dues amount, etc.) |
-| Properties | One row per property |
+| Properties | One row per property. Stores resident info (name, email, phone) plus an optional separate owner record (name, business, email, phone, mailing address) for rentals, trusts, or business-owned units. |
 | Payments | One row per payment, linked to property by ID |
 | Violations | One row per violation, linked to property by ID |
 | PropertyDocs | Document log entries, linked to property by ID |
