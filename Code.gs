@@ -24,7 +24,9 @@ function ensureSheets() {
     [S_SETTINGS]:  ['key','value'],
     [S_PROPS]:     ['id','address','lotNumber','ownerName','ownerEmail','ownerPhone',
                     'moveInDate','duesStatus','ownerOccupied',
-                    'contactName','contactPhone','contactEmail','contactAddress','notes','status'],
+                    'contactName','contactPhone','contactEmail','contactAddress','notes','status',
+                    'residentName','residentEmail','residentPhone','residentNotes',
+                    'hasOwner','ownerBusiness','ownerAddress','ownerNotes'],
     [S_PMTS]:      ['id','propertyId','date','period','amount','status','note'],
     [S_VIOLS]:     ['id','propertyId','date','description','status'],
     [S_TASKS]:     ['id','year','month','description','assignee','dueDate','status','notes'],
@@ -121,13 +123,44 @@ function getAllData() {
   const docs       = sheetToObjects(ss.getSheetByName(S_DOCS));
   return {
     settings,
-    properties: properties.map(p => ({
-      ...p,
-      status:     p.status || 'active',
-      payments:   payments.filter(pm => pm.propertyId === p.id),
-      violations: violations.filter(v  => v.propertyId  === p.id),
-      docs:       docs.filter(d => d.propertyId === p.id)
-    })),
+    properties: properties.map(p => {
+      // ── Migrate old records (ownerOccupied model → resident/owner model) ──
+      const isNewRecord = p.residentName || p.hasOwner;
+      if (!isNewRecord) {
+        if (p.ownerOccupied === 'no') {
+          // Old model: owner doesn't live there.
+          // contactName was the on-site resident/contact.
+          // ownerName was the actual owner.
+          p.residentName  = p.contactName   || '';
+          p.residentEmail = p.contactEmail  || '';
+          p.residentPhone = p.contactPhone  || '';
+          p.residentNotes = '';
+          p.hasOwner      = 'yes';
+          // ownerName/ownerEmail/ownerPhone already have owner data — keep them
+          p.ownerBusiness = '';
+          p.ownerAddress  = p.contactAddress || '';
+          p.ownerNotes    = p.notes          || '';
+        } else {
+          // Old model: owner lives there — owner = resident
+          p.residentName  = p.ownerName  || '';
+          p.residentEmail = p.ownerEmail || '';
+          p.residentPhone = p.ownerPhone || '';
+          p.residentNotes = p.notes      || '';
+          p.hasOwner      = 'no';
+          p.ownerBusiness = '';
+          p.ownerAddress  = '';
+          p.ownerNotes    = '';
+        }
+      }
+      return {
+        ...p,
+        status:     p.status || 'active',
+        hasOwner:   p.hasOwner || 'no',
+        payments:   payments.filter(pm => pm.propertyId === p.id),
+        violations: violations.filter(v  => v.propertyId  === p.id),
+        docs:       docs.filter(d => d.propertyId === p.id)
+      };
+    }),
     tasks:     sheetToObjects(ss.getSheetByName(S_TASKS)),
     templates: sheetToObjects(ss.getSheetByName(S_TEMPLATES)),
     members:   sheetToObjects(ss.getSheetByName(S_MEMBERS)),
@@ -138,13 +171,29 @@ function getAllData() {
 
 // ── Properties ────────────────────────────────────────────────────────────────
 function addProperty(p) {
-  const id = Utilities.getUuid();
-  SpreadsheetApp.getActiveSpreadsheet().getSheetByName(S_PROPS).appendRow([
-    id, p.address||'', p.lotNumber||'', p.ownerName||'', p.ownerEmail||'', p.ownerPhone||'',
-    p.moveInDate||'', p.duesStatus||'unpaid', p.ownerOccupied||'yes',
-    p.contactName||'', p.contactPhone||'', p.contactEmail||'', p.contactAddress||'',
-    p.notes||'', p.status||'active'
-  ]);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(S_PROPS);
+  const hdr   = sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0].map(h => String(h));
+  const id    = Utilities.getUuid();
+  const fields = {
+    id,
+    address:      p.address      || '',
+    lotNumber:    p.lotNumber    || '',
+    moveInDate:   p.moveInDate   || '',
+    duesStatus:   p.duesStatus   || 'unpaid',
+    status:       p.status       || 'active',
+    residentName:  p.residentName  || '',
+    residentEmail: p.residentEmail || '',
+    residentPhone: p.residentPhone || '',
+    residentNotes: p.residentNotes || '',
+    hasOwner:      p.hasOwner      || 'no',
+    ownerName:     p.ownerName     || '',
+    ownerBusiness: p.ownerBusiness || '',
+    ownerEmail:    p.ownerEmail    || '',
+    ownerPhone:    p.ownerPhone    || '',
+    ownerAddress:  p.ownerAddress  || '',
+    ownerNotes:    p.ownerNotes    || ''
+  };
+  sheet.appendRow(hdr.map(col => fields.hasOwnProperty(col) ? fields[col] : ''));
   return id;
 }
 
@@ -155,14 +204,23 @@ function updateProperty(p) {
   for (let i = 1; i < vals.length; i++) {
     if (String(vals[i][0]) === String(p.id)) {
       const fields = {
-        address:p.address||'', lotNumber:p.lotNumber||'', ownerName:p.ownerName||'',
-        ownerEmail:p.ownerEmail||'', ownerPhone:p.ownerPhone||'', moveInDate:p.moveInDate||'',
-        duesStatus:p.duesStatus||'unpaid', ownerOccupied:p.ownerOccupied||'yes',
-        contactName:p.contactName||'', contactPhone:p.contactPhone||'',
-        contactEmail:p.contactEmail||'', contactAddress:p.contactAddress||'',
-        notes:p.notes||'', status:p.status||'active'
+        address:      p.address      || '',
+        lotNumber:    p.lotNumber    || '',
+        moveInDate:   p.moveInDate   || '',
+        duesStatus:   p.duesStatus   || 'unpaid',
+        status:       p.status       || 'active',
+        residentName:  p.residentName  || '',
+        residentEmail: p.residentEmail || '',
+        residentPhone: p.residentPhone || '',
+        residentNotes: p.residentNotes || '',
+        hasOwner:      p.hasOwner      || 'no',
+        ownerName:     p.ownerName     || '',
+        ownerBusiness: p.ownerBusiness || '',
+        ownerEmail:    p.ownerEmail    || '',
+        ownerPhone:    p.ownerPhone    || '',
+        ownerAddress:  p.ownerAddress  || '',
+        ownerNotes:    p.ownerNotes    || ''
       };
-      // Build full row, preserving any columns we don't manage (e.g. future migrations)
       const newRow = hdr.map((col, idx) => fields.hasOwnProperty(col) ? fields[col] : vals[i][idx]);
       sheet.getRange(i+1, 1, 1, hdr.length).setValues([newRow]);
       return true;
